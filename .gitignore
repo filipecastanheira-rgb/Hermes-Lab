@@ -1,0 +1,21 @@
+# Ambiente virtual (já não é usado, mas por segurança)
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Segredos e configs geradas em runtime — NUNCA committar
+config/purple_auth.json
+config/purple_webhooks.json
+config/purple_ratelimit.json
+config/intelligence_config.json
+config/lab_allowed.json
+
+# Logs e dados gerados pelo Hermes a correr
+logs/
+runtime/
+
+# Sistema
+.DS_Store

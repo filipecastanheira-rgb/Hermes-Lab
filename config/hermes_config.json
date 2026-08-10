@@ -1,0 +1,10 @@
+{
+    "modo": "BLUE",
+    "modulos": [
+        "scanner",
+        "alert_engine",
+        "log_manager",
+        "auth_monitor",
+        "correlator"
+    ]
+}

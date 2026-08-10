@@ -1,0 +1,7 @@
+{
+    "intervalo_heartbeat": 1,
+    "intervalo_healthcheck": 10,
+    "intervalo_metricas": 15,
+    "nivel_alerta_minimo": "INFO",
+    "simulacao_eventos": true
+}
