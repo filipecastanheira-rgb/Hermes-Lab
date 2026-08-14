@@ -19,3 +19,4 @@ runtime/
 
 # Sistema
 .DS_Store
+*.log

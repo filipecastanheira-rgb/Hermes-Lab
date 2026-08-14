@@ -1,4 +1,7 @@
 from flask import Flask, request, jsonify, Response
+
+from hermes.tools.agregador_ferramentas import ler_uma_vez_todas
+from hermes.core.lab_boundary import alvo_permitido
 from functools import wraps
 
 
@@ -192,6 +195,48 @@ class PurpleAPI:
             token = request.args.get("token", "")
             return Response(_DASHBOARD_HTML.replace("__TOKEN__", token), mimetype="text/html")
 
+        @self.app.route("/run_tool", methods=["POST"])
+        @self._require_token
+        def run_tool():
+            """
+            Runs one tool against a target, on demand, from the
+            dashboard form. Always gated by lab_boundary — a
+            blocked target is logged as a security alert and refused,
+            never silently ignored.
+            """
+            dados = request.json or {}
+            tool = dados.get("tool", "").strip()
+            target = dados.get("target", "").strip()
+
+            if not tool or not target:
+                return jsonify({"error": "Both 'tool' and 'target' are required."}), 400
+
+            if not alvo_permitido(target):
+                alerta = self.alerts.emitir_alerta(
+                    severidade="SECURITY",
+                    origem="lab_boundary",
+                    descricao=f"Blocked out-of-lab target attempt: {target} (tool={tool})",
+                    contexto={"tool": tool, "target": target},
+                )
+                return jsonify({
+                    "error": f"Target '{target}' is outside the authorized lab boundary. Attempt logged.",
+                }), 403
+
+            eventos = ler_uma_vez_todas({tool: target})
+
+            for evento in eventos:
+                self.alerts.emitir_alerta(
+                    severidade=str(evento.get("severidade") or "INFO"),
+                    origem=evento.get("origem", tool),
+                    descricao=evento.get("assinatura", "Event found"),
+                    contexto=evento,
+                )
+
+            return self._responder(
+                "/run_tool",
+                {"tool": tool, "target": target, "events_found": len(eventos), "events": eventos},
+            )
+
     def iniciar(self, porta=5000):
         """
         Arranca o servidor Flask. Corre em thread separada, arrancada
@@ -228,7 +273,20 @@ _DASHBOARD_HTML = """
 
 <div class="grid" id="cartoes"></div>
 
-<h2 style="color:#8b949e; font-size:0.9rem;">Alertas recentes</h2>
+<h2 style="color:#8b949e; font-size:0.9rem;">Run a tool</h2>
+<div class="card" style="margin-bottom:24px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+  <select id="ferramenta" style="background:#0f1117; color:#e6e6e6; border:1px solid #30363d; padding:8px; border-radius:6px;">
+    <option value="nmap">nmap</option>
+  </select>
+  <input id="alvo" type="text" value="127.0.0.1" style="background:#0f1117; color:#e6e6e6; border:1px solid #30363d; padding:8px; border-radius:6px; flex:1; min-width:160px;">
+  <button id="btn-correr" style="background:#238636; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer;">Run</button>
+  <span id="resultado-correr" style="font-size:0.85rem;"></span>
+</div>
+
+<h2 style="color:#8b949e; font-size:0.9rem;">Events by source</h2>
+<div class="grid" id="origens" style="margin-bottom:24px;"></div>
+
+<h2 style="color:#8b949e; font-size:0.9rem;">Recent alerts</h2>
 <table id="tabela-alertas">
   <thead><tr><th>Hora</th><th>Origem</th><th>Descrição</th></tr></thead>
   <tbody><tr><td colspan="3" class="vazio">a carregar...</td></tr></tbody>
@@ -253,6 +311,18 @@ async function atualizar() {
       <div class="card"><h2>Modo</h2><div class="valor" style="font-size:1.1rem;">${d.modo || "?"}</div></div>
     `;
 
+    const contagemOrigens = {};
+    alertas.forEach(a => {
+      const origem = a.origem || a.evento?.origem || "unknown";
+      contagemOrigens[origem] = (contagemOrigens[origem] || 0) + 1;
+    });
+    const origensHtml = Object.keys(contagemOrigens).length
+      ? Object.entries(contagemOrigens).map(([origem, n]) => `
+          <div class="card"><h2>${origem}</h2><div class="valor">${n}</div></div>
+        `).join("")
+      : `<div class="card"><h2>No data yet</h2><div class="valor" style="font-size:1rem;">-</div></div>`;
+    document.getElementById("origens").innerHTML = origensHtml;
+
     const corpo = alertas.length
       ? alertas.slice(-20).reverse().map(a => `
           <tr>
@@ -268,6 +338,36 @@ async function atualizar() {
     document.getElementById("ultima-atualizacao").textContent = "erro a atualizar: " + e;
   }
 }
+
+document.getElementById("btn-correr").addEventListener("click", async () => {
+  const tool = document.getElementById("ferramenta").value;
+  const target = document.getElementById("alvo").value;
+  const resultadoEl = document.getElementById("resultado-correr");
+
+  resultadoEl.textContent = "Running...";
+  resultadoEl.style.color = "#8b949e";
+
+  try {
+    const r = await fetch("/run_tool?token=" + encodeURIComponent(TOKEN), {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({tool, target}),
+    });
+    const d = await r.json();
+
+    if (!r.ok) {
+      resultadoEl.textContent = d.error || "Blocked.";
+      resultadoEl.style.color = "#f85149";
+    } else {
+      resultadoEl.textContent = `${d.events_found} event(s) found.`;
+      resultadoEl.style.color = "#7ee787";
+      atualizar();
+    }
+  } catch (e) {
+    resultadoEl.textContent = "Error: " + e;
+    resultadoEl.style.color = "#f85149";
+  }
+});
 
 atualizar();
 setInterval(atualizar, 5000);

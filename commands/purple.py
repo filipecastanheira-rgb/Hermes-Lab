@@ -39,3 +39,40 @@ def register(router):
     router.register("purple_test", purple_test)
     router.register("purple_status", purple_status)
     router.register("purple_start", purple_start)
+    router.register("purple_dashboard", purple_dashboard)
+
+def purple_dashboard():
+    """
+    Starts PURPLE in the background and opens the dashboard in the
+    default browser automatically, with the token already filled in.
+    Usage: python3 hermes_cli.py purple purple_dashboard
+    Ctrl+C to stop.
+    """
+    import threading
+    import time
+    import webbrowser
+
+    runner = _get_runner()
+
+    thread = threading.Thread(target=runner.iniciar, daemon=True)
+    thread.start()
+
+    print("[PURPLE] Starting in the background...")
+    time.sleep(2)  # give the API a moment to come up
+
+    porta = runner.config.obter("api_port") or 5000
+    token = runner.auth.auth["token"]
+    url = f"http://localhost:{porta}/dashboard/view?token={token}"
+
+    print(f"[PURPLE] Opening dashboard: {url}")
+    try:
+        webbrowser.open(url)
+    except Exception as e:
+        print(f"[PURPLE] Could not open the browser automatically ({e}).")
+        print(f"[PURPLE] Open this URL manually: {url}")
+
+    try:
+        while thread.is_alive():
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n[PURPLE] Stopped.")
