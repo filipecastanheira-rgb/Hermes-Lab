@@ -35,6 +35,9 @@ from hermes.purple.purple_health import PurpleHealthCheck
 from hermes.purple.purple_watchdog import PurpleWatchdog
 
 from hermes.utils.metrics import Metrics
+from hermes.core.event_store import apply_retention
+from hermes.modes.mode_router import ModeRouter
+from hermes.tools.agregador_ferramentas import vigiar_todas
 
 
 class PurpleRunner:
@@ -66,6 +69,8 @@ class PurpleRunner:
             webhooks=self.webhooks,
             dashboard=self.dashboard,
         )
+        self._ultima_retencao = 0
+        self._intervalo_retencao = 3600  # correr a retenção 1x por hora
         self._api_thread = threading.Thread(
             target=self.api.iniciar, kwargs={"porta": self.config.obter("api_port") or 5000}, daemon=True,
         )
@@ -88,6 +93,20 @@ class PurpleRunner:
 
         self._api_thread.start()
         self.logger.info("API PURPLE iniciada em thread separada.")
+        # Arranca a vigilancia continua das ferramentas de fundo
+        # (Suricata, Zeek) - Fase 0 raw/clean, nunca deve impedir o
+        # PURPLE de arrancar se falhar.
+        try:
+            self._blue_router = ModeRouter("config/hermes_config.json")
+            self._blue_router.iniciar()
+            vigiar_todas(self._blue_router, {
+                "suricata": "/var/log/suricata/eve.json",
+                "zeek": "/opt/zeek/logs/current/conn.log",
+            })
+            self.logger.info("Vigilancia continua (Suricata/Zeek) iniciada.")
+        except Exception as e:
+            self.logger.error(f"Falha ao iniciar vigilancia continua: {e}")
+
 
         self._loop_principal()
 
@@ -119,5 +138,14 @@ class PurpleRunner:
 
             duracao = time.time() - inicio
             self.metrics.registar_latencia("loop_purple", duracao)
+
+            # Retencao raw/+clean/ (Fase 0) - corre no maximo 1x/hora
+            if time.time() - self._ultima_retencao >= self._intervalo_retencao:
+                try:
+                    removidos = apply_retention()
+                    self.logger.info(f"Retencao aplicada: {removidos}")
+                except Exception as e:
+                    self.logger.error(f"Retencao falhou: {e}")
+                self._ultima_retencao = time.time()
 
             time.sleep(intervalo_heartbeat)

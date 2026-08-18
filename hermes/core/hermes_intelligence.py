@@ -47,7 +47,7 @@ class HermesIntelligence:
 
     def _usar_ollama(self, prompt):
         import requests
-        model = self.model or "phi3:mini"
+        model = self.model or "llama3.2:3b"
         try:
             r = requests.post(
                 "http://localhost:11434/api/generate",
@@ -59,6 +59,36 @@ class HermesIntelligence:
             return r.json().get("response", "")
         except Exception as e:
             return f"[Hermes] Ollama não está a correr ou não está acessível: {e}"
+
+    def gerar_com_tools(self, prompt, tools):
+        """
+        Chama o Ollama via /api/chat com tool calling nativo (nao /api/generate).
+        Devolve tool_calls estruturados (pode ser lista vazia) em vez de texto livre.
+        Nao executa nada aqui - quem recebe o resultado decide se despacha.
+        """
+        import requests
+        model = self.model or "llama3.2:3b"
+        try:
+            r = requests.post(
+                "http://localhost:11434/api/chat",
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "tools": tools,
+                    "stream": False,
+                },
+                timeout=30,
+            )
+            if r.status_code != 200:
+                return {"erro": f"[Hermes] Erro Ollama (tools): {r.text[:200]}"}
+            data = r.json()
+            message = data.get("message", {})
+            return {
+                "tool_calls": message.get("tool_calls", []),
+                "content": message.get("content", ""),
+            }
+        except Exception as e:
+            return {"erro": f"[Hermes] Ollama (tools) nao esta a correr ou nao esta acessivel: {e}"}
 
     def _usar_openai(self, prompt):
         import requests

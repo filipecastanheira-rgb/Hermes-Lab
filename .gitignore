@@ -20,3 +20,5 @@ runtime/
 # Sistema
 .DS_Store
 *.log
+secrets/*
+!secrets/credentials.example.json

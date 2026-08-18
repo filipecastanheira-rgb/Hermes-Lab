@@ -45,8 +45,10 @@ from orchestrator import HermesOrchestrator
 
 def main():
     if len(sys.argv) < 2:
-        print("[CLI] Erro: tens de indicar o modo (blue, red, purple).")
-        sys.exit(1)
+        # Sem argumentos: arranca o PURPLE (API+dashboard+IA) por
+        # defeito, tal como "hermes" fazia no Ubuntu antigo.
+        print("[CLI] Sem argumentos - a arrancar PURPLE (API+dashboard) por defeito.")
+        sys.argv = [sys.argv[0], "purple", "purple_dashboard"]
 
     mode = sys.argv[1].lower()
 
