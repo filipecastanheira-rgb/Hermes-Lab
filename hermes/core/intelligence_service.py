@@ -149,6 +149,87 @@ class IntelligenceService:
         )
 
 
+    def decide_action(
+        self,
+        question: str,
+        *,
+        now=None,
+        source: str | None = None,
+        event_type: str | None = None,
+        target: str | None = None,
+        mission_id: str | None = None,
+        mission_target: str = "127.0.0.1",
+    ) -> dict:
+        """
+        Caminho experimental de tool-calling (Fase 1 de autonomia).
+
+        A IA pode decidir SE e QUAL ferramenta pre-aprovada chamar
+        (nmap/tshark, ver tool_dispatcher.FERRAMENTAS_PERMITIDAS_IA)
+        com base no contexto de eventos reais - mas nunca decide ONDE.
+        O alvo real de qualquer acao e sempre `mission_target`
+        (por defeito localhost). Qualquer target que a IA tente
+        colocar no tool_call e ignorado e substituido por
+        mission_target antes do dispatch - a IA nunca escolhe o alvo
+        livremente, mesmo que o tente. Alargar mission_target para
+        alem do localhost e sempre uma decisao explicita do
+        utilizador/missao, nunca inferida pela IA.
+
+        Nesta fase, qualquer tool_call decidido e despachado
+        automaticamente - sem confirmacao humana extra - porque
+        nmap/tshark sao reconhecimento nao-destrutivo e continuam
+        sempre limitados pelo lab_boundary dentro do dispatcher.
+        A autonomia sera alargada por fases (RED, acoes de defesa)
+        so depois de validado o comportamento em BLUE.
+        """
+        from .tool_dispatcher import construir_schemas_tools, dispatch
+
+        context = build_context(
+            question,
+            config=self.context_config,
+            now=now,
+            source=source,
+            event_type=event_type,
+            target=target,
+            mission_id=mission_id,
+        )
+        prompt = self._prompt(question, context)
+        tools = construir_schemas_tools()
+        resultado = self.intelligence.gerar_com_tools(prompt, tools)
+
+        if "erro" in resultado:
+            return {
+                "answer": resultado["erro"],
+                "acoes": [],
+                "question": question.strip(),
+                "context": context,
+            }
+
+        acoes = []
+        for tool_call in resultado.get("tool_calls", []):
+            tool_call = dict(tool_call)
+            function = dict(tool_call.get("function", {}))
+            argumentos = dict(function.get("arguments", {}))
+            argumentos["target"] = mission_target
+            function["arguments"] = argumentos
+            tool_call["function"] = function
+
+            acoes.append({
+                "tool_call": tool_call,
+                "resultado": dispatch(tool_call),
+            })
+
+        answer = resultado.get("content", "") or ""
+        if not answer and acoes:
+            answer = f"Executada(s) {len(acoes)} acao(oes) com base na decisao da IA."
+
+        return {
+            "answer": answer,
+            "acoes": acoes,
+            "question": question.strip(),
+            "context": context,
+        }
+
+
 def make_intelligence_service(
     intelligence: HermesIntelligence,
     *,

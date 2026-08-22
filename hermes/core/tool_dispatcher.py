@@ -7,9 +7,18 @@ HermesIntelligence.gerar_com_tools) e a execucao real das ferramentas.
 Regras de seguranca (fixas, nao negociaveis nesta fase):
 - A IA nunca gera comandos livres. So pode escolher um nome de uma
   lista fixa pre-aprovada (FERRAMENTAS_PERMITIDAS_IA).
-- Todo o alvo passa sempre por lab_boundary.alvo_permitido() antes de
-  qualquer execucao - exatamente a mesma validacao usada pelo
-  endpoint manual /run_tool em purple_api.py.
+- Ferramentas com tipo_alvo="ip" (ex: nmap): o alvo passa sempre por
+  lab_boundary.alvo_permitido() antes de qualquer execucao - a mesma
+  validacao usada pelo endpoint manual /run_tool em purple_api.py.
+- Ferramentas com tipo_alvo="interface_fixa" (ex: tshark): o TShark
+  captura por interface de rede, nao por IP - nao faz sentido validar
+  isso como endereco. Em vez disso, a interface e sempre fixa
+  (interface_fixa), nunca escolhida pela IA - qualquer valor que a IA
+  tente colocar no tool_call e substituido pela interface fixa antes
+  do dispatch, tal como mission_target faz para o nmap em
+  IntelligenceService.decide_action(). A protecao lab_boundary do
+  TShark ja existe dentro de tshark_reader.py, aplicada pacote a
+  pacote (Fase 0).
 - Fase 1: apenas ferramentas on-demand simples e sincronas (nmap,
   tshark). Suricata/Zeek ficam de fora (sao so vigilancia continua
   via vigiar_todas()). OpenVAS fica de fora ate a integracao GMP
@@ -21,28 +30,28 @@ from hermes.core.lab_boundary import alvo_permitido
 from hermes.tools.agregador_ferramentas import ler_uma_vez_todas
 
 
-# Lista fixa de ferramentas que a IA pode pedir. Acrescentar uma
-# ferramenta nova aqui e o unico sitio a mexer para a expor a IA -
-# nunca inventar chamadas fora desta lista.
 FERRAMENTAS_PERMITIDAS_IA = {
     "run_nmap": {
         "nome_interno": "nmap",
         "descricao": "Corre um scan Nmap a um alvo especifico dentro do lab_boundary.",
+        "tipo_alvo": "ip",
     },
     "run_tshark": {
         "nome_interno": "tshark",
-        "descricao": "Captura trafego com TShark num alvo/interface dentro do lab_boundary.",
+        "descricao": "Captura trafego com TShark. A interface e sempre fixa (nunca escolhida pela IA).",
+        "tipo_alvo": "interface_fixa",
+        "interface_fixa": "lo",
     },
 }
 
 
 def construir_schemas_tools():
-    """
-    Gera a lista de schemas JSON (formato Ollama /api/chat) a partir
-    de FERRAMENTAS_PERMITIDAS_IA, para passar a gerar_com_tools().
-    """
     schemas = []
     for nome_funcao, info in FERRAMENTAS_PERMITIDAS_IA.items():
+        if info["tipo_alvo"] == "ip":
+            descricao_target = "IP ou rede a analisar, tem de estar dentro do lab_boundary"
+        else:
+            descricao_target = "Nao usado - a interface de captura e sempre fixa, ignorado se enviado"
         schemas.append({
             "type": "function",
             "function": {
@@ -53,7 +62,7 @@ def construir_schemas_tools():
                     "properties": {
                         "target": {
                             "type": "string",
-                            "description": "IP ou rede a analisar, tem de estar dentro do lab_boundary",
+                            "description": descricao_target,
                         }
                     },
                     "required": ["target"],
@@ -63,18 +72,10 @@ def construir_schemas_tools():
     return schemas
 
 
-def dispatch(tool_call: dict) -> dict:
-    """
-    Recebe UM tool_call (um item da lista tool_calls devolvida por
-    gerar_com_tools) e, se tudo validar, executa a ferramenta real.
-
-    Nunca corre nada fora da lista pre-aprovada nem fora do
-    lab_boundary. Devolve sempre um dict com "ok" (bool) e detalhe.
-    """
+def dispatch(tool_call):
     function = tool_call.get("function", {})
     nome_funcao = function.get("name", "")
     argumentos = function.get("arguments", {})
-    target = str(argumentos.get("target", "")).strip()
 
     if nome_funcao not in FERRAMENTAS_PERMITIDAS_IA:
         return {
@@ -82,16 +83,21 @@ def dispatch(tool_call: dict) -> dict:
             "erro": f"Ferramenta '{nome_funcao}' nao esta na lista pre-aprovada para a IA.",
         }
 
-    if not target:
-        return {"ok": False, "erro": "Alvo em falta no tool_call."}
+    info = FERRAMENTAS_PERMITIDAS_IA[nome_funcao]
+    nome_interno = info["nome_interno"]
 
-    if not alvo_permitido(target):
-        return {
-            "ok": False,
-            "erro": f"Alvo '{target}' fora do lab_boundary. Pedido recusado e nao executado.",
-        }
+    if info["tipo_alvo"] == "ip":
+        target = str(argumentos.get("target", "")).strip()
+        if not target:
+            return {"ok": False, "erro": "Alvo em falta no tool_call."}
+        if not alvo_permitido(target):
+            return {
+                "ok": False,
+                "erro": f"Alvo '{target}' fora do lab_boundary. Pedido recusado e nao executado.",
+            }
+    else:
+        target = info["interface_fixa"]
 
-    nome_interno = FERRAMENTAS_PERMITIDAS_IA[nome_funcao]["nome_interno"]
     eventos = ler_uma_vez_todas({nome_interno: target})
 
     return {

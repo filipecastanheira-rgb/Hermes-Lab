@@ -47,6 +47,8 @@ def alvo_permitido(ip_ou_rede: str) -> bool:
             rede = ipaddress.ip_network(rede_str, strict=False)
         except ValueError:
             continue
+        if alvo.version != rede.version:
+            continue
         if alvo == rede or alvo.subnet_of(rede):
             return True
 

@@ -38,6 +38,10 @@ from hermes.utils.metrics import Metrics
 from hermes.core.event_store import apply_retention
 from hermes.modes.mode_router import ModeRouter
 from hermes.tools.agregador_ferramentas import vigiar_todas
+from pathlib import Path
+from hermes.core.hermes_intelligence import HermesIntelligence
+from hermes.core.intelligence_service import make_intelligence_service
+from hermes.core.context_builder import ContextConfig
 
 
 class PurpleRunner:
@@ -71,6 +75,12 @@ class PurpleRunner:
         )
         self._ultima_retencao = 0
         self._intervalo_retencao = 3600  # correr a retenção 1x por hora
+        self._ultima_decisao_ia = 0
+        self._intervalo_decisao_ia = 300  # decisao autonoma da IA a cada 5 minutos
+        self._intelligence_service = make_intelligence_service(
+            HermesIntelligence(),
+            context_config=ContextConfig(clean_dir=Path("hermes/runtime/clean")),
+        )
         self._api_thread = threading.Thread(
             target=self.api.iniciar, kwargs={"porta": self.config.obter("api_port") or 5000}, daemon=True,
         )
@@ -99,6 +109,8 @@ class PurpleRunner:
         try:
             self._blue_router = ModeRouter("config/hermes_config.json")
             self._blue_router.iniciar()
+            from hermes.core.dependency_manager import garantir_dependencias
+            garantir_dependencias(self.logger)
             vigiar_todas(self._blue_router, {
                 "suricata": "/var/log/suricata/eve.json",
                 "zeek": "/opt/zeek/logs/current/conn.log",
@@ -147,5 +159,34 @@ class PurpleRunner:
                 except Exception as e:
                     self.logger.error(f"Retencao falhou: {e}")
                 self._ultima_retencao = time.time()
+            # Decisao autonoma da IA (Fase 1: nmap/tshark, dentro do
+            # lab_boundary, alvo sempre fixo - ver decide_action()).
+            # Cada acao tomada (ou recusada) fica visivel no dashboard
+            # via alertas, para o utilizador ver o que o Hermes esta
+            # a fazer sem ter de escolher a ferramenta manualmente.
+            if time.time() - self._ultima_decisao_ia >= self._intervalo_decisao_ia:
+                try:
+                    resultado = self._intelligence_service.decide_action(
+                        "Ha algum evento recente que precise de investigacao?"
+                    )
+                    for acao in resultado.get("acoes", []):
+                        r = acao["resultado"]
+                        if r.get("ok"):
+                            self.alerts.emitir_alerta(
+                                severidade="INFO",
+                                origem="hermes_ia",
+                                descricao=f"IA correu '{r.get('ferramenta')}' em '{r.get('target')}'",
+                                contexto={"eventos_capturados": len(r.get("eventos", []))},
+                            )
+                        else:
+                            self.alerts.emitir_alerta(
+                                severidade="INFO",
+                                origem="hermes_ia",
+                                descricao=f"IA tentou uma acao mas foi recusada: {r.get('erro')}",
+                                contexto={},
+                            )
+                except Exception as e:
+                    self.logger.error(f"Decisao autonoma da IA falhou: {e}")
+                self._ultima_decisao_ia = time.time()
 
             time.sleep(intervalo_heartbeat)
