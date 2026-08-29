@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 SEVERITIES = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
-DEFAULT_CLEAN_DIR = Path("runtime/clean")
+DEFAULT_CLEAN_DIR = Path(__file__).resolve().parent.parent / "runtime" / "clean"
 DEFAULT_MAX_EVENTS = 50
 DEFAULT_MAX_CHARS = 12000
 DEFAULT_LOOKBACK_HOURS = 6

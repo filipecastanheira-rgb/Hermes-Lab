@@ -7,9 +7,10 @@ HermesIntelligence.gerar_com_tools) e a execucao real das ferramentas.
 Regras de seguranca (fixas, nao negociaveis nesta fase):
 - A IA nunca gera comandos livres. So pode escolher um nome de uma
   lista fixa pre-aprovada (FERRAMENTAS_PERMITIDAS_IA).
-- Ferramentas com tipo_alvo="ip" (ex: nmap): o alvo passa sempre por
-  lab_boundary.alvo_permitido() antes de qualquer execucao - a mesma
-  validacao usada pelo endpoint manual /run_tool em purple_api.py.
+- Ferramentas com tipo_alvo="ip" (ex: nmap, openvas): o alvo passa
+  sempre por lab_boundary.alvo_permitido() antes de qualquer
+  execucao - a mesma validacao usada pelo endpoint manual /run_tool
+  em purple_api.py.
 - Ferramentas com tipo_alvo="interface_fixa" (ex: tshark): o TShark
   captura por interface de rede, nao por IP - nao faz sentido validar
   isso como endereco. Em vez disso, a interface e sempre fixa
@@ -20,10 +21,15 @@ Regras de seguranca (fixas, nao negociaveis nesta fase):
   TShark ja existe dentro de tshark_reader.py, aplicada pacote a
   pacote (Fase 0).
 - Fase 1: apenas ferramentas on-demand simples e sincronas (nmap,
-  tshark). Suricata/Zeek ficam de fora (sao so vigilancia continua
-  via vigiar_todas()). OpenVAS fica de fora ate a integracao GMP
-  estar fechada do lado do ChatGPT - a estrutura aqui ja e pensada
-  para ser extensivel quando isso acontecer.
+  tshark, openvas). Suricata/Zeek ficam de fora (sao so vigilancia
+  continua via vigiar_todas()).
+- AVISO (openvas): ao contrario do nmap/tshark, um scan OpenVAS pode
+  demorar varios minutos - dispatch() para "run_openvas" bloqueia ate
+  o scan terminar (ver aviso de arquitetura em
+  hermes/tools/openvas/openvas_reader.py). Se isto se tornar um
+  problema pratico no loop periodico de decide_action() (5 min),
+  reavaliar (ex: rodar em thread separada ou aumentar o intervalo do
+  loop quando openvas e chamado).
 """
 
 from hermes.core.lab_boundary import alvo_permitido
@@ -41,6 +47,11 @@ FERRAMENTAS_PERMITIDAS_IA = {
         "descricao": "Captura trafego com TShark. A interface e sempre fixa (nunca escolhida pela IA).",
         "tipo_alvo": "interface_fixa",
         "interface_fixa": "lo",
+    },
+    "run_openvas": {
+        "nome_interno": "openvas",
+        "descricao": "Corre um scan de vulnerabilidades OpenVAS/Greenbone a um alvo especifico dentro do lab_boundary. Scan pesado e demorado (pode levar varios minutos) - usar com moderacao.",
+        "tipo_alvo": "ip",
     },
 }
 
@@ -80,7 +91,7 @@ def dispatch(tool_call):
     if nome_funcao not in FERRAMENTAS_PERMITIDAS_IA:
         return {
             "ok": False,
-            "erro": f"Ferramenta '{nome_funcao}' nao esta na lista pre-aprovada para a IA.",
+            "erro": "Ferramenta '" + nome_funcao + "' nao esta na lista pre-aprovada para a IA.",
         }
 
     info = FERRAMENTAS_PERMITIDAS_IA[nome_funcao]
@@ -93,7 +104,7 @@ def dispatch(tool_call):
         if not alvo_permitido(target):
             return {
                 "ok": False,
-                "erro": f"Alvo '{target}' fora do lab_boundary. Pedido recusado e nao executado.",
+                "erro": "Alvo '" + target + "' fora do lab_boundary. Pedido recusado e nao executado.",
             }
     else:
         target = info["interface_fixa"]

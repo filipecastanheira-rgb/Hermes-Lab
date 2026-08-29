@@ -10,16 +10,15 @@ from hermes.tools.suricata import suricata_reader
 from hermes.tools.nmap import nmap_reader
 from hermes.tools.tshark import tshark_reader
 from hermes.tools.zeek import zeek_reader
-
+from hermes.tools.openvas import openvas_reader
 FERRAMENTAS_REGISTADAS = {
     "suricata": suricata_reader,
     "nmap": nmap_reader,
     "tshark": tshark_reader,
     "zeek": zeek_reader,
+    "openvas": openvas_reader,
 }
-
-
-def ler_uma_vez_todas(alvos: dict) -> list:
+def ler_uma_vez_todas(alvos):
     """
     alvos: {"suricata": "/var/log/suricata/eve.json", "tshark": "eth0", ...}
     So corre as ferramentas cujo nome apareca em 'alvos'.
@@ -28,12 +27,10 @@ def ler_uma_vez_todas(alvos: dict) -> list:
     for nome, modulo in FERRAMENTAS_REGISTADAS.items():
         if nome not in alvos:
             continue
-        print(f"[AGREGADOR] A ler '{nome}'...")
+        print("[AGREGADOR] A ler '" + nome + "'...")
         eventos.extend(modulo.ler_uma_vez(alvos[nome]))
     return eventos
-
-
-def vigiar_todas(router, alvos: dict):
+def vigiar_todas(router, alvos):
     """
     Arranca uma thread de vigilancia continua por cada ferramenta
     presente em 'alvos'. Devolve a lista de threads (para o chamador
@@ -43,7 +40,7 @@ def vigiar_todas(router, alvos: dict):
     for nome, modulo in FERRAMENTAS_REGISTADAS.items():
         if nome not in alvos:
             continue
-        print(f"[AGREGADOR] A vigiar '{nome}'...")
+        print("[AGREGADOR] A vigiar '" + nome + "'...")
         t = threading.Thread(
             target=modulo.vigiar, args=(router, alvos[nome]), daemon=True
         )
