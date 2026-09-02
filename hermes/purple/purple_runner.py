@@ -14,6 +14,21 @@ Corrigido face ao original (tudo testado):
   esse método
 - health-check dentro do loop agora está protegido por try/except,
   para nunca mais matar o processo todo por uma falha de um componente
+
+Autonomia decomissionada (2026-08-30): o Hermes teve, entre
+2026-08-2X e 2026-08-30, um loop autonomo de decisao (a IA local
+escolhia sozinha se e qual tool correr, a cada 5 min) e relatorios
+automaticos. Testes empiricos mostraram que a IA local decide bem
+UMA VEZ com uma pergunta orientada, mas nao encadeia decisoes (nao
+reage a um resultado suspeito chamando outra tool sozinha). Decisao:
+o Hermes passa a operar em modo manual - o utilizador escolhe a tool
+e o alvo via dashboard, o Hermes despacha e gera um relatorio dessa
+execucao especifica (ver hermes/purple/purple_api.py, rota
+/run_tool, e IntelligenceService.escrever_relatorio_execucao() em
+hermes/core/intelligence_service.py). O codigo do loop autonomo nao
+foi apagado - esta preservado, funcional, em
+hermes/_archive/autonomia_experimental/, com nota de como retomar se
+um dia fizer sentido.
 """
 
 import threading
@@ -75,8 +90,6 @@ class PurpleRunner:
         )
         self._ultima_retencao = 0
         self._intervalo_retencao = 3600  # correr a retenção 1x por hora
-        self._ultima_decisao_ia = 0
-        self._intervalo_decisao_ia = 300  # decisao autonoma da IA a cada 5 minutos
         self._intelligence_service = make_intelligence_service(
             HermesIntelligence(),
             context_config=ContextConfig(clean_dir=Path("hermes/runtime/clean")),
@@ -105,7 +118,9 @@ class PurpleRunner:
         self.logger.info("API PURPLE iniciada em thread separada.")
         # Arranca a vigilancia continua das ferramentas de fundo
         # (Suricata, Zeek) - Fase 0 raw/clean, nunca deve impedir o
-        # PURPLE de arrancar se falhar.
+        # PURPLE de arrancar se falhar. Isto e passivo (escuta trafego
+        # ja existente), nao e uma "decisao" - continua a correr
+        # independentemente do modo manual/autonomo.
         try:
             self._blue_router = ModeRouter("config/hermes_config.json")
             self._blue_router.iniciar()
@@ -118,7 +133,6 @@ class PurpleRunner:
             self.logger.info("Vigilancia continua (Suricata/Zeek) iniciada.")
         except Exception as e:
             self.logger.error(f"Falha ao iniciar vigilancia continua: {e}")
-
 
         self._loop_principal()
 
@@ -159,34 +173,11 @@ class PurpleRunner:
                 except Exception as e:
                     self.logger.error(f"Retencao falhou: {e}")
                 self._ultima_retencao = time.time()
-            # Decisao autonoma da IA (Fase 1: nmap/tshark, dentro do
-            # lab_boundary, alvo sempre fixo - ver decide_action()).
-            # Cada acao tomada (ou recusada) fica visivel no dashboard
-            # via alertas, para o utilizador ver o que o Hermes esta
-            # a fazer sem ter de escolher a ferramenta manualmente.
-            if time.time() - self._ultima_decisao_ia >= self._intervalo_decisao_ia:
-                try:
-                    resultado = self._intelligence_service.decide_action(
-                        "Ha algum evento recente que precise de investigacao?"
-                    )
-                    for acao in resultado.get("acoes", []):
-                        r = acao["resultado"]
-                        if r.get("ok"):
-                            self.alerts.emitir_alerta(
-                                severidade="INFO",
-                                origem="hermes_ia",
-                                descricao=f"IA correu '{r.get('ferramenta')}' em '{r.get('target')}'",
-                                contexto={"eventos_capturados": len(r.get("eventos", []))},
-                            )
-                        else:
-                            self.alerts.emitir_alerta(
-                                severidade="INFO",
-                                origem="hermes_ia",
-                                descricao=f"IA tentou uma acao mas foi recusada: {r.get('erro')}",
-                                contexto={},
-                            )
-                except Exception as e:
-                    self.logger.error(f"Decisao autonoma da IA falhou: {e}")
-                self._ultima_decisao_ia = time.time()
+
+            # Sem decisao autonoma aqui por design (ver nota no topo do
+            # ficheiro e hermes/_archive/autonomia_experimental/). O
+            # utilizador escolhe a tool e o alvo via dashboard/API
+            # (/run_tool), o Hermes despacha e gera um relatorio dessa
+            # execucao especifica - nunca decide sozinho.
 
             time.sleep(intervalo_heartbeat)

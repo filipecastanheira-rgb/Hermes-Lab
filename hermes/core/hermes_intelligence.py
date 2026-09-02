@@ -49,10 +49,16 @@ class HermesIntelligence:
         import requests
         model = self.model or "llama3.2:3b"
         try:
+            # Timeout aumentado de 30 -> 120 -> 200s (2026-08-30). 120s ainda
+            # falhou numa primeira execucao a seguir a um restart do Hermes
+            # (Ollama "frio" + prompt pesado do relatorio de execucao,
+            # combinados). Uma segunda tentativa a seguir, com o modelo ja
+            # "quente", levou ~40s sem problema. 200s da margem para o pior
+            # caso (frio + prompt grande) sem arriscar timeouts falsos.
             r = requests.post(
                 "http://localhost:11434/api/generate",
                 json={"model": model, "prompt": prompt, "stream": False},
-                timeout=30,
+                timeout=200,
             )
             if r.status_code != 200:
                 return f"[Hermes] Erro Ollama: {r.text[:200]}"

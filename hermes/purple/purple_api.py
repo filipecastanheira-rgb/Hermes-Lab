@@ -211,7 +211,17 @@ class PurpleAPI:
             if not tool or not target:
                 return jsonify({"error": "Both 'tool' and 'target' are required."}), 400
 
-            if not alvo_permitido(target):
+            # lab_boundary so faz sentido para tools cujo "alvo" e um IP/rede
+            # real (nmap, openvas) - o seu objetivo e impedir scans fora do
+            # lab autorizado. Para tshark (interface de rede, ex: "lo") e
+            # suricata/zeek (caminho de ficheiro de log), o "alvo" nao e um
+            # endereco de rede alcancavel - e sempre local por natureza,
+            # tal como ja acontecia no caminho da IA (tool_dispatcher.py,
+            # tipo_alvo="interface_fixa"). Validar "lo" como se fosse um IP
+            # rejeitava sempre, por design - nao era um bug do boundary em
+            # si, era o tipo errado de dado a passar por ele.
+            FERRAMENTAS_BASEADAS_EM_IP = {"nmap", "openvas"}
+            if tool in FERRAMENTAS_BASEADAS_EM_IP and not alvo_permitido(target):
                 alerta = self.alerts.emitir_alerta(
                     severidade="SECURITY",
                     origem="lab_boundary",
@@ -222,7 +232,23 @@ class PurpleAPI:
                     "error": f"Target '{target}' is outside the authorized lab boundary. Attempt logged.",
                 }), 403
 
-            eventos = ler_uma_vez_todas({tool: target})
+            try:
+                eventos = ler_uma_vez_todas({tool: target})
+            except Exception as e:
+                self.logger.error(f"Falha ao correr '{tool}' contra '{target}': {e}")
+                self.alerts.emitir_alerta(
+                    severidade="ERROR",
+                    origem=tool,
+                    descricao=f"Execucao falhou: {e}",
+                    contexto={"tool": tool, "target": target},
+                )
+                return jsonify({
+                    "error": (
+                        f"A ferramenta '{tool}' falhou a correr contra '{target}': {e}. "
+                        "Nota: tshark/suricata/zeek esperam uma interface de rede "
+                        "(ex: 'lo', 'eth0'), nao um IP - nmap/openvas esperam um IP."
+                    ),
+                }), 500
 
             for evento in eventos:
                 self.alerts.emitir_alerta(
@@ -232,9 +258,36 @@ class PurpleAPI:
                     contexto=evento,
                 )
 
+            # Relatorio desta execucao especifica (2026-08-30, modo manual -
+            # ver nota em hermes/purple/purple_runner.py sobre a decisao de
+            # desligar a autonomia). Nunca deve rebentar a resposta - se
+            # falhar, escrever_relatorio_execucao() ja devolve uma mensagem
+            # clara em vez de propagar excecao, mas mantem-se o try/except
+            # aqui por seguranca extra.
+            relatorio = ""
+            try:
+                from hermes.core.hermes_intelligence import HermesIntelligence
+                from hermes.core.intelligence_service import make_intelligence_service
+                from hermes.core.context_builder import ContextConfig
+                from pathlib import Path as _Path
+
+                servico = make_intelligence_service(
+                    HermesIntelligence(),
+                    context_config=ContextConfig(clean_dir=_Path("hermes/runtime/clean")),
+                )
+                relatorio = servico.escrever_relatorio_execucao(tool, target, eventos)
+            except Exception as e:
+                relatorio = f"Não foi possível gerar o relatório desta execução: {e}"
+
             return self._responder(
                 "/run_tool",
-                {"tool": tool, "target": target, "events_found": len(eventos), "events": eventos},
+                {
+                    "tool": tool,
+                    "target": target,
+                    "events_found": len(eventos),
+                    "events": eventos,
+                    "relatorio": relatorio,
+                },
             )
 
     def iniciar(self, porta=5000):
@@ -243,7 +296,13 @@ class PurpleAPI:
         pelo purple_runner.
         """
         self.logger.info(f"API PURPLE a arrancar na porta {porta}.")
-        self.app.run(host="0.0.0.0", port=porta, use_reloader=False)
+        # threaded=True (2026-08-30): sem isto, o servidor de desenvolvimento
+        # do Flask e single-threaded - um pedido longo (ex: /run_tool com
+        # openvas, que pode demorar minutos) bloqueava TODOS os outros
+        # pedidos, incluindo o polling do dashboard a cada 5s. Confirmado
+        # como causa provavel de erros de rede no browser durante execucoes
+        # longas.
+        self.app.run(host="0.0.0.0", port=porta, use_reloader=False, threaded=True)
 
 
 _DASHBOARD_HTML = """
@@ -277,10 +336,20 @@ _DASHBOARD_HTML = """
 <div class="card" style="margin-bottom:24px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
   <select id="ferramenta" style="background:#0f1117; color:#e6e6e6; border:1px solid #30363d; padding:8px; border-radius:6px;">
     <option value="nmap">nmap</option>
+    <option value="tshark">tshark</option>
+    <option value="suricata">suricata</option>
+    <option value="zeek">zeek</option>
+    <option value="openvas">openvas</option>
   </select>
   <input id="alvo" type="text" value="127.0.0.1" style="background:#0f1117; color:#e6e6e6; border:1px solid #30363d; padding:8px; border-radius:6px; flex:1; min-width:160px;">
+  <span id="ajuda-alvo" style="font-size:0.75rem; color:#8b949e; width:100%;">nmap/openvas: IP (ex: 127.0.0.1) · tshark: interface de rede (ex: lo) · suricata/zeek: caminho do ficheiro de log</span>
   <button id="btn-correr" style="background:#238636; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer;">Run</button>
   <span id="resultado-correr" style="font-size:0.85rem;"></span>
+</div>
+
+<h2 style="color:#8b949e; font-size:0.9rem;">Relatório da última execução</h2>
+<div class="card" id="relatorio-execucao" style="margin-bottom:24px; line-height:1.5; white-space:pre-wrap;">
+  <div class="vazio">Corre uma ferramenta acima para ver o relatório aqui.</div>
 </div>
 
 <h2 style="color:#8b949e; font-size:0.9rem;">Events by source</h2>
@@ -339,13 +408,32 @@ async function atualizar() {
   }
 }
 
+document.getElementById("ferramenta").addEventListener("change", () => {
+  const tool = document.getElementById("ferramenta").value;
+  const alvoEl = document.getElementById("alvo");
+  // Cada tool espera um tipo de "alvo" diferente: nmap/openvas querem um
+  // IP; tshark quer uma interface de rede; suricata/zeek querem o
+  // caminho do ficheiro de log que leem (os mesmos caminhos usados na
+  // vigilancia continua de fundo, ver purple_runner.py).
+  const valoresDefeito = {
+    nmap: "127.0.0.1",
+    openvas: "127.0.0.1",
+    tshark: "lo",
+    suricata: "/var/log/suricata/eve.json",
+    zeek: "/opt/zeek/logs/current/conn.log",
+  };
+  alvoEl.value = valoresDefeito[tool] || "127.0.0.1";
+});
+
 document.getElementById("btn-correr").addEventListener("click", async () => {
   const tool = document.getElementById("ferramenta").value;
   const target = document.getElementById("alvo").value;
   const resultadoEl = document.getElementById("resultado-correr");
+  const relatorioEl = document.getElementById("relatorio-execucao");
 
-  resultadoEl.textContent = "Running...";
+  resultadoEl.textContent = "Running... (pode demorar ate 2 min, sobretudo para openvas)";
   resultadoEl.style.color = "#8b949e";
+  relatorioEl.innerHTML = `<div class="vazio">a gerar relatório...</div>`;
 
   try {
     const r = await fetch("/run_tool?token=" + encodeURIComponent(TOKEN), {
@@ -358,14 +446,17 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
     if (!r.ok) {
       resultadoEl.textContent = d.error || "Blocked.";
       resultadoEl.style.color = "#f85149";
+      relatorioEl.innerHTML = `<div class="vazio">${d.error || "Bloqueado."}</div>`;
     } else {
       resultadoEl.textContent = `${d.events_found} event(s) found.`;
       resultadoEl.style.color = "#7ee787";
+      relatorioEl.textContent = d.relatorio || "(sem relatório)";
       atualizar();
     }
   } catch (e) {
     resultadoEl.textContent = "Error: " + e;
     resultadoEl.style.color = "#f85149";
+    relatorioEl.innerHTML = `<div class="vazio">Erro: ${e}</div>`;
   }
 });
 

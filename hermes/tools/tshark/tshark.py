@@ -54,12 +54,27 @@ class TSharkTool:
         for campo in self.CAMPOS:
             comando.extend(["-e", campo])
 
-        resultado = subprocess.run(
-            comando,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        # Timeout adicionado (2026-08-30): sem isto, se a interface nao
+        # tiver trafego suficiente para completar a contagem pedida (-c),
+        # o tshark fica preso indefinidamente a espera de pacotes, sem
+        # nenhum limite - o pedido nunca voltava, causando erros de rede
+        # no browser (confirmado em uso real: interface "lo" sem trafego
+        # ativo suficiente). 30s da tempo para trafego normal, mas nunca
+        # bloqueia para sempre.
+        try:
+            resultado = subprocess.run(
+                comando,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(
+                f"TShark nao capturou {count} pacote(s) em 30s na interface "
+                f"'{interface}' - pode nao haver trafego suficiente nessa "
+                "interface neste momento."
+            )
 
         if resultado.returncode != 0:
             raise RuntimeError(
