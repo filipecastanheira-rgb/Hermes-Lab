@@ -2,30 +2,28 @@ import json
 import os
 import time
 import hashlib
+import secrets
+import hmac
+
 
 class PurpleAuth:
     """
     Sistema de autenticação por token para a API PURPLE.
     """
-
     def __init__(self, ficheiro="config/purple_auth.json"):
         self.ficheiro = ficheiro
         os.makedirs(os.path.dirname(ficheiro), exist_ok=True)
-
         if not os.path.exists(self.ficheiro):
             self._criar_auth_inicial()
-
         self.auth = self._carregar()
 
     def _criar_auth_inicial(self):
-        token_inicial = self._gerar_token("hermes-default")
-
+        token_inicial = secrets.token_hex(32)
         dados = {
             "token": token_inicial,
             "criado_em": time.ctime(),
             "descricao": "Token inicial gerado automaticamente."
         }
-
         with open(self.ficheiro, "w") as f:
             json.dump(dados, f, indent=4)
 
@@ -42,7 +40,7 @@ class PurpleAuth:
         return hash_obj.hexdigest()
 
     def validar(self, token_recebido):
-        return token_recebido == self.auth["token"]
+        return hmac.compare_digest(token_recebido, self.auth["token"])
 
     def atualizar_token(self, novo_base):
         novo_token = self._gerar_token(novo_base)
@@ -56,4 +54,3 @@ class PurpleAuth:
         print(f" - token: {self.auth['token']}")
         print(f" - criado em: {self.auth['criado_em']}")
         print(f" - descricao: {self.auth['descricao']}\n")
-

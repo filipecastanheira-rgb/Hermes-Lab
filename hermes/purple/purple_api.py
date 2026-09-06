@@ -302,7 +302,7 @@ class PurpleAPI:
         # pedidos, incluindo o polling do dashboard a cada 5s. Confirmado
         # como causa provavel de erros de rede no browser durante execucoes
         # longas.
-        self.app.run(host="0.0.0.0", port=porta, use_reloader=False, threaded=True)
+        self.app.run(host="127.0.0.1", port=porta, use_reloader=False, threaded=True)
 
 
 _DASHBOARD_HTML = """
