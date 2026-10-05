@@ -366,7 +366,9 @@ const TOKEN = "__TOKEN__";
 
 async function atualizar() {
   try {
-    const r = await fetch("/dashboard?token=" + encodeURIComponent(TOKEN));
+    const r = await fetch("/dashboard", {
+      headers: {"X-Hermes-Token": TOKEN},
+    });
     const d = await r.json();
 
     const metricas = d.metricas || {};
@@ -436,9 +438,9 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
   relatorioEl.innerHTML = `<div class="vazio">a gerar relatório...</div>`;
 
   try {
-    const r = await fetch("/run_tool?token=" + encodeURIComponent(TOKEN), {
+    const r = await fetch("/run_tool", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: {"Content-Type": "application/json", "X-Hermes-Token": TOKEN},
       body: JSON.stringify({tool, target}),
     });
     const d = await r.json();
