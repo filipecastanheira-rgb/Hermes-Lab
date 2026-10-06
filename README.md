@@ -20,6 +20,16 @@ All results flow through the same pipeline: raw output → `hermes/runtime/raw/`
 
 Every tool call is gated by `hermes/core/lab_boundary.py`, an explicit allowlist of authorized IPs/networks (`config/lab_allowed.json`, `127.0.0.0/8` by default). This boundary exists to make sure no automated decision — human or AI — can ever act outside an authorized scope; the human operator is the one who decides what's in that allowlist.
 
+## Screenshots
+
+**Dashboard with a completed scan and AI-generated report:**
+
+![Hermes dashboard showing a completed nmap scan and its report](docs/screenshots/dashboard-report.png)
+
+**Automated test suite:**
+
+![13 automated tests passing](docs/screenshots/tests-passing.png)
+
 ## What was tested, and what wasn't confirmed: autonomous decision-making
 
 The core of the original vision — an AI that decides on its own and chains multiple tool calls to investigate a situation — was tested directly and empirically, not assumed.
