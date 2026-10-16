@@ -37,7 +37,11 @@ class PurpleAPI:
     def _require_token(self, func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            token = request.headers.get("X-Hermes-Token") or request.args.get("token")
+            token = request.headers.get("X-Hermes-Token")
+            # A browser navigation cannot set headers, so the initial dashboard
+            # page load is the only route that may take the token from the URL.
+            if not token and request.path == "/dashboard/view":
+                token = request.args.get("token")
             ip = request.remote_addr
             endpoint = request.path
 
