@@ -1,6 +1,7 @@
 import time
 import os
 import json
+import hashlib
 
 class PurpleRateLimit:
     """
@@ -40,6 +41,8 @@ class PurpleRateLimit:
         return [t for t in lista if agora - t < 60]
 
     def verificar_token(self, token):
+        # Key by a hash so the registry file never stores the token itself.
+        token = hashlib.sha256(token.encode()).hexdigest()[:16]
         if token not in self.registos["tokens"]:
             self.registos["tokens"][token] = []
 

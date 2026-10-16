@@ -56,13 +56,15 @@ class PurpleAPI:
                 self.api_logger.log_acesso_negado(endpoint, f"Rate limit IP excedido ({ip})")
                 return jsonify({"erro": "Rate limit excedido para este IP"}), 429
 
-            if token and not self.ratelimit.verificar_token(token):
-                self.api_logger.log_acesso_negado(endpoint, f"Rate limit token excedido ({token})")
-                return jsonify({"erro": "Rate limit excedido para este token"}), 429
-
             if not token or not self.auth.validar(token):
                 self.api_logger.log_erro_autenticacao(endpoint, token)
                 return jsonify({"erro": "Token inválido ou ausente"}), 403
+
+            # Only a valid token is rate-limited, so arbitrary strings sent by a
+            # client never accumulate in the rate-limit registry.
+            if not self.ratelimit.verificar_token(token):
+                self.api_logger.log_acesso_negado(endpoint, "Rate limit token excedido")
+                return jsonify({"erro": "Rate limit excedido para este token"}), 429
 
             return func(*args, **kwargs)
         return wrapper

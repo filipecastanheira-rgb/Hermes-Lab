@@ -3,6 +3,13 @@ import time
 import os
 
 
+def _mascarar(token):
+    """Never write a full token to the logs: keep only the first 4 characters."""
+    if not token:
+        return token
+    return str(token)[:4] + "..."
+
+
 class PurpleAPILogger:
     """
     Logger estruturado em JSON para auditoria da API PURPLE.
@@ -41,7 +48,7 @@ class PurpleAPILogger:
         self._escrever("chamada", {
             "endpoint": endpoint,
             "metodo": metodo,
-            "token": token,
+            "token": _mascarar(token),
             "payload": payload
         })
 
@@ -62,7 +69,7 @@ class PurpleAPILogger:
     def log_erro_autenticacao(self, endpoint, token):
         self._escrever("erro_autenticacao", {
             "endpoint": endpoint,
-            "token": token
+            "token": _mascarar(token)
         })
 
     # ============================================================
