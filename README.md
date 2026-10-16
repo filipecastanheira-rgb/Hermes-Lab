@@ -38,6 +38,8 @@ The autonomous decision loop that was built and tested is not deleted — it's p
 
 ## Current architecture
 
+Hermes is organized in layers, not run modes. There is a single way to run it: manual operation, started with `hermes_cli.py`. BLUE and PURPLE are names for parts of the code, not modes the user selects.
+
 ```
 HERMES (hermes_cli.py → PurpleRunner)
    │
@@ -77,6 +79,14 @@ This starts the PURPLE service (API, background monitoring, dashboard) and opens
 - **`lab_boundary` defaults to `127.0.0.0/8` only.** Scanning any other network (e.g., a device on your local LAN) requires explicitly adding it to `config/lab_allowed.json` first — by design, this is a decision only the human operator makes, never automated.
 - **Report quality reflects the local model's limits.** The small local LLM occasionally produces reports with internal inconsistencies (e.g., stating "no suspicious activity found" while also rating the risk level as "High"). Reports should be read as a helpful first pass, not a final verdict.
 - **No autonomous or scheduled scanning.** Every execution is triggered manually. Background monitoring (Suricata/Zeek) is passive and continuous, but doesn't trigger any tool on its own.
+
+## Archived / not part of the current program
+
+Kept under `hermes/_archive/` for history. None of it is imported or run by the current program.
+
+- `autonomia_experimental/` - the autonomous decision loop (see "The decision" above). `IntelligenceService.decide_action()` also remains in the active code, together with its tests, but is not connected to any execution path.
+- `legado_pre_modo_manual/` - the former RED/BLUE/PURPLE run-mode system, the command-line router and the orchestrator, replaced by a single entry point (`hermes_cli.py`) once Hermes became manual. The RED mode was never implemented beyond an empty stub.
+- `tcpdump/` - redundant with TShark, which covers the same capability and is fully integrated.
 
 ## Security scope
 
