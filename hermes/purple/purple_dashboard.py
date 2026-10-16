@@ -90,7 +90,6 @@ class PurpleDashboard:
         alertas = self._carregar_alertas()
         dashboard = {
             "timestamp": time.time(),
-            "modo": "PURPLE",
             "estado": "ativo",
             "config": self.config.config,
             "metricas": metricas_atuais,
