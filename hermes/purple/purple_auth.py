@@ -1,7 +1,6 @@
 import json
 import os
 import time
-import hashlib
 import secrets
 import hmac
 
@@ -35,15 +34,11 @@ class PurpleAuth:
         with open(self.ficheiro, "w") as f:
             json.dump(self.auth, f, indent=4)
 
-    def _gerar_token(self, base):
-        hash_obj = hashlib.sha256(base.encode())
-        return hash_obj.hexdigest()
-
     def validar(self, token_recebido):
         return hmac.compare_digest(token_recebido, self.auth["token"])
 
-    def atualizar_token(self, novo_base):
-        novo_token = self._gerar_token(novo_base)
+    def atualizar_token(self):
+        novo_token = secrets.token_hex(32)
         self.auth["token"] = novo_token
         self.auth["criado_em"] = time.ctime()
         self._guardar()

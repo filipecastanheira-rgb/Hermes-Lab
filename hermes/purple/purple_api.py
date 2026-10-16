@@ -164,11 +164,10 @@ class PurpleAPI:
         @self.app.route("/token/regenerar", methods=["POST"])
         @self._require_token
         def regenerar_token():
-            dados = request.json or {}
-            base = dados.get("base", "hermes-default")
-
-            novo_token = self.auth.atualizar_token(base)
-            self.api_logger.log_token_regenerado(novo_token)
+            # The new token is always random (secrets.token_hex). Any "base"
+            # sent by the client is ignored, so it can never be predictable.
+            novo_token = self.auth.atualizar_token()
+            self.api_logger.log_token_regenerado()
 
             resposta = {"novo_token": novo_token}
 
@@ -327,8 +326,8 @@ _DASHBOARD_HTML = """
 </style>
 </head>
 <body>
-<h1>Hermes — Dashboard PURPLE</h1>
-<div class="sub">Atualiza automaticamente a cada 5s · <span id="ultima-atualizacao" class="status">a carregar...</span></div>
+<h1>Hermes — PURPLE Dashboard</h1>
+<div class="sub">Refreshes automatically every 5s · <span id="ultima-atualizacao" class="status">loading...</span></div>
 
 <div class="grid" id="cartoes"></div>
 
@@ -342,14 +341,14 @@ _DASHBOARD_HTML = """
     <option value="openvas">openvas</option>
   </select>
   <input id="alvo" type="text" value="127.0.0.1" style="background:#0f1117; color:#e6e6e6; border:1px solid #30363d; padding:8px; border-radius:6px; flex:1; min-width:160px;">
-  <span id="ajuda-alvo" style="font-size:0.75rem; color:#8b949e; width:100%;">nmap/openvas: IP (ex: 127.0.0.1) · tshark: interface de rede (ex: lo) · suricata/zeek: caminho do ficheiro de log</span>
+  <span id="ajuda-alvo" style="font-size:0.75rem; color:#8b949e; width:100%;">nmap/openvas: IP (e.g. 127.0.0.1) · tshark: network interface (e.g. lo) · suricata/zeek: path to the log file</span>
   <button id="btn-correr" style="background:#238636; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer;">Run</button>
   <span id="resultado-correr" style="font-size:0.85rem;"></span>
 </div>
 
-<h2 style="color:#8b949e; font-size:0.9rem;">Relatório da última execução</h2>
+<h2 style="color:#8b949e; font-size:0.9rem;">Last run report</h2>
 <div class="card" id="relatorio-execucao" style="margin-bottom:24px; line-height:1.5; white-space:pre-wrap;">
-  <div class="vazio">Corre uma ferramenta acima para ver o relatório aqui.</div>
+  <div class="vazio">Run a tool above to see the report here.</div>
 </div>
 
 <h2 style="color:#8b949e; font-size:0.9rem;">Events by source</h2>
@@ -357,8 +356,8 @@ _DASHBOARD_HTML = """
 
 <h2 style="color:#8b949e; font-size:0.9rem;">Recent alerts</h2>
 <table id="tabela-alertas">
-  <thead><tr><th>Hora</th><th>Origem</th><th>Descrição</th></tr></thead>
-  <tbody><tr><td colspan="3" class="vazio">a carregar...</td></tr></tbody>
+  <thead><tr><th>Time</th><th>Source</th><th>Description</th></tr></thead>
+  <tbody><tr><td colspan="3" class="vazio">loading...</td></tr></tbody>
 </table>
 
 <script>
@@ -401,12 +400,12 @@ async function atualizar() {
             <td>${(a.origem || a.evento?.origem || "-")}</td>
             <td>${(a.descricao || a.evento?.assinatura || JSON.stringify(a).slice(0,80))}</td>
           </tr>`).join("")
-      : `<tr><td colspan="3" class="vazio">Sem alertas ainda.</td></tr>`;
+      : `<tr><td colspan="3" class="vazio">No alerts yet.</td></tr>`;
 
     document.getElementById("tabela-alertas").querySelector("tbody").innerHTML = corpo;
-    document.getElementById("ultima-atualizacao").textContent = "última atualização: " + new Date().toLocaleTimeString();
+    document.getElementById("ultima-atualizacao").textContent = "last update: " + new Date().toLocaleTimeString();
   } catch (e) {
-    document.getElementById("ultima-atualizacao").textContent = "erro a atualizar: " + e;
+    document.getElementById("ultima-atualizacao").textContent = "update error: " + e;
   }
 }
 
@@ -433,9 +432,9 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
   const resultadoEl = document.getElementById("resultado-correr");
   const relatorioEl = document.getElementById("relatorio-execucao");
 
-  resultadoEl.textContent = "Running... (pode demorar ate 2 min, sobretudo para openvas)";
+  resultadoEl.textContent = "Running... (can take up to 2 min, especially for openvas)";
   resultadoEl.style.color = "#8b949e";
-  relatorioEl.innerHTML = `<div class="vazio">a gerar relatório...</div>`;
+  relatorioEl.innerHTML = `<div class="vazio">generating report...</div>`;
 
   try {
     const r = await fetch("/run_tool", {
@@ -448,17 +447,17 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
     if (!r.ok) {
       resultadoEl.textContent = d.error || "Blocked.";
       resultadoEl.style.color = "#f85149";
-      relatorioEl.innerHTML = `<div class="vazio">${d.error || "Bloqueado."}</div>`;
+      relatorioEl.innerHTML = `<div class="vazio">${d.error || "Blocked."}</div>`;
     } else {
       resultadoEl.textContent = `${d.events_found} event(s) found.`;
       resultadoEl.style.color = "#7ee787";
-      relatorioEl.textContent = d.relatorio || "(sem relatório)";
+      relatorioEl.textContent = d.relatorio || "(no report)";
       atualizar();
     }
   } catch (e) {
     resultadoEl.textContent = "Error: " + e;
     resultadoEl.style.color = "#f85149";
-    relatorioEl.innerHTML = `<div class="vazio">Erro: ${e}</div>`;
+    relatorioEl.innerHTML = `<div class="vazio">Error: ${e}</div>`;
   }
 });
 

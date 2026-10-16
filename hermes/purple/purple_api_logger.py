@@ -49,6 +49,8 @@ class PurpleAPILogger:
     # Auditoria de respostas
     # ============================================================
     def log_resposta(self, endpoint, resposta):
+        if isinstance(resposta, dict) and "novo_token" in resposta:
+            resposta = {**resposta, "novo_token": "***"}
         self._escrever("resposta", {
             "endpoint": endpoint,
             "resposta": resposta
@@ -75,8 +77,6 @@ class PurpleAPILogger:
     # ============================================================
     # Regeneração de tokens
     # ============================================================
-    def log_token_regenerado(self, novo_token):
-        self._escrever("token_regenerado", {
-            "novo_token": novo_token
-        })
+    def log_token_regenerado(self):
+        self._escrever("token_regenerado", {})
 
