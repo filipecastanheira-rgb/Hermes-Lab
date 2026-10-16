@@ -378,7 +378,7 @@ async function atualizar() {
     document.getElementById("cartoes").innerHTML = `
       <div class="card"><h2>Status</h2><div class="valor" style="font-size:1.1rem;">${d.estado || "?"}</div></div>
       <div class="card"><h2>Heartbeats PURPLE</h2><div class="valor">${contadores.heartbeat_purple || 0}</div></div>
-      <div class="card"><h2>Falhas de health-check</h2><div class="valor">${contadores.healthcheck_falha || 0}</div></div>
+      <div class="card"><h2>Health-check failures (this run)</h2><div class="valor">${contadores.healthcheck_falha || 0}</div></div>
       <div class="card"><h2>Operation</h2><div class="valor" style="font-size:1.1rem;">manual</div></div>
     `;
 

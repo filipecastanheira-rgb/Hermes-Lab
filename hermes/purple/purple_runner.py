@@ -64,6 +64,9 @@ class PurpleRunner:
         self.logger = PurpleLogger()
         self.config = PurpleConfig()
         self.metrics = Metrics()
+        # Per-run counter: failures from earlier runs (including old versions)
+        # must not show up in the dashboard.
+        self.metrics.metricas["contadores"]["healthcheck_falha"] = 0
         self.alerts = PurpleAlerts(self.logger)
         self.commands = PurpleCommands(self.config, self.logger, self.alerts)
         self.auth = PurpleAuth()
