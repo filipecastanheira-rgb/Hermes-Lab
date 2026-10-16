@@ -2,7 +2,7 @@ import time
 
 class PurpleCommands:
     """
-    Sistema de comandos internos para o modo PURPLE.
+    Sistema de comandos internos para o camada PURPLE.
     Permite controlar o pipeline contínuo em tempo real.
     """
 

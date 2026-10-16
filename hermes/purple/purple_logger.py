@@ -5,7 +5,7 @@ import os
 
 class PurpleLogger:
     """
-    Logger estruturado em JSON para o modo PURPLE.
+    Logger estruturado em JSON para o camada PURPLE.
     Compatível com ELK, Splunk, Sentinel e qualquer SIEM moderno.
     """
 
@@ -21,7 +21,7 @@ class PurpleLogger:
             "timestamp": time.time(),
             "nivel": nivel,
             "mensagem": mensagem,
-            "modo": "PURPLE"
+            "camada": "PURPLE"
         }
 
         if extra:

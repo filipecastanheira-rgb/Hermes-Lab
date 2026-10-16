@@ -27,7 +27,8 @@ Regras de seguranca (fixas, nao negociaveis nesta fase):
   demorar varios minutos - dispatch() para "run_openvas" bloqueia ate
   o scan terminar (ver aviso de arquitetura em
   hermes/tools/openvas/openvas_reader.py). Se isto se tornar um
-  problema pratico no loop periodico de decide_action() (5 min),
+  problema pratico no loop periodico de decide_action() (5 min, hoje arquivado em
+  hermes/_archive/autonomia_experimental/),
   reavaliar (ex: rodar em thread separada ou aumentar o intervalo do
   loop quando openvas e chamado).
 """

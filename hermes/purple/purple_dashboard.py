@@ -7,7 +7,7 @@ from hermes.core.context_builder import ContextConfig, load_events
 
 class PurpleDashboard:
     """
-    Dashboard consolidado do modo PURPLE.
+    Dashboard consolidado do camada PURPLE.
     Agrega:
     - métricas atuais
     - histórico

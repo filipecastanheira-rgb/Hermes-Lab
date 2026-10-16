@@ -1,6 +1,6 @@
 """
 purple_health.py
-Health-check do modo PURPLE.
+Health-check do camada PURPLE.
 
 Corrigido: o purple_runner.py original reaproveitava o health_check.py
 do BLUE, que espera um objeto "router" com atributos .scanner,

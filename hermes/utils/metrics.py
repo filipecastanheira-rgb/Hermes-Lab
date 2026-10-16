@@ -5,7 +5,7 @@ import os
 
 class Metrics:
     """
-    Sistema de métricas persistentes para o modo PURPLE.
+    Sistema de métricas persistentes para o camada PURPLE.
     Guarda:
     - contadores
     - latências

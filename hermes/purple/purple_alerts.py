@@ -5,7 +5,7 @@ import os
 
 class PurpleAlerts:
     """
-    Sistema de alertas avançados para o modo PURPLE.
+    Sistema de alertas avançados para o camada PURPLE.
     Regista alertas críticos com severidade, contexto e origem.
 
     Corrigido:

@@ -81,7 +81,7 @@ class IntelligenceService:
         mission_id: str | None = None,
     ) -> IntelligenceResult:
         """
-        Caminho usado pelo Hermes autónomo.
+        Caminho base de análise: responde a uma tarefa com base nos eventos recentes.
 
         `question` é a tarefa de análise criada pelo próprio Hermes.
         A resposta do LLM é análise textual; não autoriza execução.
@@ -102,7 +102,7 @@ class IntelligenceService:
             answer=str(answer),
             question=question.strip(),
             context=context,
-            source="autonomous",
+            source="analysis",
             event_count=_extract_event_count(context),
         )
 

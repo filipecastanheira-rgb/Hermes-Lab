@@ -1,6 +1,6 @@
 """
 purple_watchdog.py
-Watchdog do modo PURPLE.
+Watchdog do camada PURPLE.
 
 Corrigido: o purple_runner.py original chamava self.watchdog.recuperar(),
 mas o único watchdog.py que existia (do BLUE) só tem

@@ -25,7 +25,7 @@ class PurpleAPILogger:
         evento = {
             "timestamp": time.time(),
             "tipo": tipo,
-            "modo": "PURPLE_API",
+            "camada": "PURPLE_API",
             "dados": dados
         }
 

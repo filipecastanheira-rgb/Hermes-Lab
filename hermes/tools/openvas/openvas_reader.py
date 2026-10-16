@@ -20,7 +20,8 @@ periodico de decide_action() (que corre de 5 em 5 min), essa chamada
 pode bloquear o loop por mais tempo que o proprio intervalo. Fica
 aceite por agora, na mesma logica de "ferramentas on-demand simples e
 sincronas" ja usada para nmap/tshark - mas e um ponto a re-avaliar se
-o OpenVAS comecar a ser chamado com frequencia pela IA autonoma.
+o OpenVAS comecar a ser chamado com frequencia pela IA autonoma (loop hoje arquivado; no modo manual so corre
+quando o utilizador o pede).
 
 Sempre protegido pelo lab_boundary - o alvo passa por
 alvo_permitido() antes de qualquer chamada GMP, tal como acontece com

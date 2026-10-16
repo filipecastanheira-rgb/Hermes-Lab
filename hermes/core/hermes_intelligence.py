@@ -1,7 +1,7 @@
 """
 hermes_intelligence.py
 Provider de IA do núcleo Hermes, unificado para viver dentro de
-~/Hermes-Lab/orchestrator/ (não depende de /opt/hermes).
+~/Hermes-Lab/ (não depende de /opt/hermes).
 
 Config: config/intelligence_config.json
   {"provider": "none" | "openai" | "ollama", "model": "..."}

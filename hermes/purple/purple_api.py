@@ -7,7 +7,7 @@ from functools import wraps
 
 class PurpleAPI:
     """
-    API interna do modo PURPLE.
+    API interna do camada PURPLE.
     Autenticação + auditoria + rate limiting + cache + compressão + webhooks + dashboard.
 
     Corrigido: o ficheiro original cortava a meio da rota

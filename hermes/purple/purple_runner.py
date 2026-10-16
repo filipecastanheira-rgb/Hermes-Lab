@@ -1,6 +1,6 @@
 """
 purple_runner.py
-Runner principal do modo PURPLE.
+Runner principal do camada PURPLE.
 
 Corrigido face ao original (tudo testado):
 - PurpleAlerts(logger, metrics) -> a classe só aceita (logger)

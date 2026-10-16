@@ -4,7 +4,7 @@ import time
 
 class PurpleConfig:
     """
-    Sistema de configuração dinâmica para o modo PURPLE.
+    Sistema de configuração dinâmica para o camada PURPLE.
     Permite alterar parâmetros sem reiniciar o Hermes.
     """
 
