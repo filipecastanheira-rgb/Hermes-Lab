@@ -56,16 +56,20 @@ Every tool shares the same contract (`parse_evento` / `ler_uma_vez` / `vigiar`),
 
 ## Running it
 
+**Requirements:** Python 3.12 (tested), Firefox, and [Ollama](https://ollama.com) with the `llama3.2:3b` model pulled (`ollama pull llama3.2:3b`). The security tools are optional and are started on demand: nmap, tshark, Suricata, Zeek and OpenVAS/Greenbone. The automated tests need none of them.
+
 ```bash
 git clone https://github.com/filipecastanheira-rgb/Hermes-Lab.git
 cd Hermes-Lab
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp config/intelligence_config.example.json config/intelligence_config.json
 python3 hermes_cli.py
 ```
 
-This starts the PURPLE service (API, background monitoring, dashboard) and opens the dashboard in your browser. From there, pick a tool, set a target, and run it.
+This starts the PURPLE service (API, background monitoring, dashboard) and opens the dashboard in a Firefox **private window**. From there, pick a tool, set a target, and run it. Run the tests with `pytest tests/`.
 
-**Note:** the dashboard uses `fetch()` calls with a `?token=` query parameter for authentication. Some browser privacy extensions block requests shaped this way. If you get a generic "NetworkError" with no request ever leaving the browser, try a private/incognito window first to confirm — then allow `localhost:5000` in your extension's settings.
+**Why a private window:** API calls authenticate with an `X-Hermes-Token` header, and the initial page load carries the token in the URL (a browser navigation cannot set headers). Some privacy extensions block requests shaped this way, and the dashboard then fails with a generic "NetworkError"; a private window, where extensions are normally disabled, avoids that. If Firefox is not installed, Hermes falls back to your default browser and prints the URL.
 
 ## Known limitations
 

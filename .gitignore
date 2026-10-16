@@ -1,4 +1,4 @@
-# Ambiente virtual (já não é usado, mas por segurança)
+# Virtual environments
 .venv/
 venv/
 
