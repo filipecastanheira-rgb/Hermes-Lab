@@ -5,8 +5,11 @@ and what is (and isn't) covered by automated tests.
 
 ## Authentication
 
-The PURPLE API is protected by a bearer token stored in
-`config/purple_auth.json`.
+The PURPLE API is protected by a random token stored in
+`config/purple_auth.json` and sent in the `X-Hermes-Token` request header. The
+initial dashboard page load (`/dashboard/view`) passes it in the URL query
+string instead, because a browser navigation cannot set headers; this is a
+known, accepted limitation.
 
 - **Token generation:** the initial token is generated with
   `secrets.token_hex(32)` (a cryptographically random 256-bit value), created
@@ -34,8 +37,11 @@ future, is meant to bypass this check.
 
 ## AI tool-calling constraints
 
-When the AI decision layer (`IntelligenceService.decide_action()`) is used, it
-is allowed to decide **whether** and **which** pre-approved tool to call
+`IntelligenceService.decide_action()` is **not connected to any execution path**
+in the current manual mode (see the README and
+`hermes/_archive/autonomia_experimental/`). It is kept, together with its tests,
+so the constraints below still hold if autonomy is ever reintroduced. If used,
+it is allowed to decide **whether** and **which** pre-approved tool to call
 (from a fixed allowlist in `tool_dispatcher.py`), but it never decides
 **where**:
 
