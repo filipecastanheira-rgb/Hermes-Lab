@@ -51,7 +51,7 @@ from hermes.purple.purple_watchdog import PurpleWatchdog
 
 from hermes.utils.metrics import Metrics
 from hermes.core.event_store import apply_retention
-from hermes.modes.mode_router import ModeRouter
+from hermes.blue.pipeline import BluePipeline
 from hermes.tools.agregador_ferramentas import vigiar_todas
 from pathlib import Path
 from hermes.core.hermes_intelligence import HermesIntelligence
@@ -122,7 +122,7 @@ class PurpleRunner:
         # ja existente), nao e uma "decisao" - continua a correr
         # independentemente do modo manual/autonomo.
         try:
-            self._blue_router = ModeRouter("config/hermes_config.json")
+            self._blue_router = BluePipeline("config/hermes_config.json")
             self._blue_router.iniciar()
             from hermes.core.dependency_manager import garantir_dependencias
             garantir_dependencias(self.logger)

@@ -1,5 +1,4 @@
 {
-    "modo": "BLUE",
     "modulos": [
         "scanner",
         "alert_engine",
