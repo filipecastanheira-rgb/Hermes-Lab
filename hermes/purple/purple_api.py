@@ -103,7 +103,7 @@ class PurpleAPI:
 
             stats = self.metrics.obter_estatisticas()
             resposta = {
-                "status": "Hermes PURPLE ativo",
+                "status": "Hermes PURPLE active",
                 "config": self.config.config,
                 "metricas": stats,
             }
@@ -249,9 +249,9 @@ class PurpleAPI:
                 )
                 return jsonify({
                     "error": (
-                        f"A ferramenta '{tool}' falhou a correr contra '{target}': {e}. "
-                        "Nota: tshark/suricata/zeek esperam uma interface de rede "
-                        "(ex: 'lo', 'eth0'), nao um IP - nmap/openvas esperam um IP."
+                        f"The tool '{tool}' failed to run against '{target}': {e}. "
+                        "Note: tshark expects a network interface "
+                        "(e.g. 'lo', 'eth0'), suricata/zeek a log file path, and nmap/openvas an IP."
                     ),
                 }), 500
 
@@ -282,7 +282,7 @@ class PurpleAPI:
                 )
                 relatorio = servico.escrever_relatorio_execucao(tool, target, eventos)
             except Exception as e:
-                relatorio = f"Não foi possível gerar o relatório desta execução: {e}"
+                relatorio = f"The report for this run could not be generated: {e}"
 
             return self._responder(
                 "/run_tool",

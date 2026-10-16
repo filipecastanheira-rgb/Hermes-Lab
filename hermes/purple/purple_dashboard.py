@@ -90,7 +90,7 @@ class PurpleDashboard:
         alertas = self._carregar_alertas()
         dashboard = {
             "timestamp": time.time(),
-            "estado": "ativo",
+            "estado": "active",
             "config": self.config.config,
             "metricas": metricas_atuais,
             "historico_metricas": historico[-50:],  # últimos 50 eventos
