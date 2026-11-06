@@ -27,6 +27,25 @@ header.
   from other devices on the local network or from the internet, even if the
   host machine has other services exposed.
 
+## Tokens in logs and persisted state
+
+The API log (`logs/purple_api.log`) and the rate-limit state
+(`config/purple_ratelimit.json`) are plaintext files on disk. Neither holds a
+token: every entry carries `token_ref`, a truncated SHA-256 of the token. That
+is enough to correlate requests made with the same token (and to spot repeated
+abuse) but not enough to reconstruct it.
+
+This was not always true. Earlier versions wrote the token on every call, the
+full token on authentication failures, the **newly issued** token on rotation,
+and used the token itself as a JSON key in the rate-limit file. **If you ran
+Hermes before this change: rotate the token** (`POST /token/regenerar`) and
+treat the old log files as secret material — delete them, or move them out of
+`logs/`.
+
+Authentication also happens before anything is logged as a call, so a rejected
+request produces only an `erro_autenticacao`/`acesso_negado` entry and the body
+of an unauthenticated request never reaches the log.
+
 An earlier version of this project generated the initial token as
 `sha256("hermes-default")` — a fixed, publicly computable value for anyone
 reading the source code. This was found and fixed before the project's public
@@ -80,6 +99,9 @@ just manual verification:
   and refused everywhere else: no token, wrong token, and a valid token in the
   query string all return `403`; the URL token is never copied into the API
   log, and a request with `?token=` is recorded as an alert.
+- `test_purple_api_logger.py` — no code path writes a token in clear: calls,
+  authentication failures, token rotation and the rate-limit state file all
+  store only `token_ref`.
 
 These tests run with `pytest tests/` and are intended to keep failing loudly
 if any of these invariants ever regresses, rather than relying on the author

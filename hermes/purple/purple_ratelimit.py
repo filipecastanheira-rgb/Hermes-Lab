@@ -1,6 +1,7 @@
 import time
 import os
 import json
+import hashlib
 
 class PurpleRateLimit:
     """
@@ -18,6 +19,11 @@ class PurpleRateLimit:
             self._criar_registo_inicial()
 
         self.registos = self._carregar()
+
+    @staticmethod
+    def _chave(token):
+        """Resumo estavel do token: o ficheiro de estado nao guarda o token."""
+        return hashlib.sha256(str(token).encode()).hexdigest()[:16]
 
     def _criar_registo_inicial(self):
         dados = {
@@ -40,17 +46,20 @@ class PurpleRateLimit:
         return [t for t in lista if agora - t < 60]
 
     def verificar_token(self, token):
-        if token not in self.registos["tokens"]:
-            self.registos["tokens"][token] = []
+        # A chave no ficheiro de estado e um resumo do token, nunca o token:
+        # config/purple_ratelimit.json nao deve conter segredos em claro.
+        chave = self._chave(token)
+        if chave not in self.registos["tokens"]:
+            self.registos["tokens"][chave] = []
 
-        timestamps = self.registos["tokens"][token]
+        timestamps = self.registos["tokens"][chave]
         timestamps = self._limpar_antigos(timestamps)
 
         if len(timestamps) >= self.max_por_minuto:
             return False  # rate limit excedido
 
         timestamps.append(time.time())
-        self.registos["tokens"][token] = timestamps
+        self.registos["tokens"][chave] = timestamps
         self._guardar()
         return True
 

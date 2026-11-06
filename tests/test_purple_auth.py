@@ -102,6 +102,8 @@ def test_sem_token_e_recusado(ctx):
     r = client.get("/protegido")
     assert r.status_code == 403
     assert stub.api_logger.falhas_auth == [{"endpoint": "/protegido", "token": None}]
+    # um pedido rejeitado nao conta como chamada autenticada
+    assert stub.api_logger.chamadas == []
 
 
 def test_token_invalido_e_recusado(ctx):
@@ -109,6 +111,7 @@ def test_token_invalido_e_recusado(ctx):
     r = client.get("/protegido", headers={"X-Hermes-Token": "errado"})
     assert r.status_code == 403
     assert stub.api_logger.falhas_auth == [{"endpoint": "/protegido", "token": "errado"}]
+    assert stub.api_logger.chamadas == []
 
 
 def test_token_na_url_e_recusado_mesmo_valido(ctx):

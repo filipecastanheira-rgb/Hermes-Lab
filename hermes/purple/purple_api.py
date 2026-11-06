@@ -74,24 +74,28 @@ class PurpleAPI:
 
             token = request.headers.get("X-Hermes-Token")
 
+            if not self.ratelimit.verificar_ip(ip):
+                self.api_logger.log_acesso_negado(endpoint, f"Rate limit IP excedido ({ip})")
+                return jsonify({"erro": "Rate limit excedido para este IP"}), 429
+
+            if token and not self.ratelimit.verificar_token(token):
+                self.api_logger.log_acesso_negado(endpoint, "Rate limit do token excedido")
+                return jsonify({"erro": "Rate limit excedido para este token"}), 429
+
+            if not token or not self.auth.validar(token):
+                self.api_logger.log_erro_autenticacao(endpoint, token)
+                return jsonify({"erro": "Token inválido ou ausente"}), 403
+
+            # So os pedidos autenticados ficam registados como "chamada": um
+            # pedido rejeitado ja fica em erro_autenticacao/acesso_negado, e o
+            # corpo de um pedido nao autenticado (controlado por quem o envia)
+            # nao deve ser copiado para o log.
             self.api_logger.log_chamada(
                 endpoint=endpoint,
                 metodo=request.method,
                 token=token,
                 payload=request.json if request.is_json else {},
             )
-
-            if not self.ratelimit.verificar_ip(ip):
-                self.api_logger.log_acesso_negado(endpoint, f"Rate limit IP excedido ({ip})")
-                return jsonify({"erro": "Rate limit excedido para este IP"}), 429
-
-            if token and not self.ratelimit.verificar_token(token):
-                self.api_logger.log_acesso_negado(endpoint, f"Rate limit token excedido ({token})")
-                return jsonify({"erro": "Rate limit excedido para este token"}), 429
-
-            if not token or not self.auth.validar(token):
-                self.api_logger.log_erro_autenticacao(endpoint, token)
-                return jsonify({"erro": "Token inválido ou ausente"}), 403
 
             return func(*args, **kwargs)
         return wrapper
