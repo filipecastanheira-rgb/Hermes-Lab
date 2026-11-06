@@ -34,12 +34,45 @@ class PurpleAPI:
         self.app = Flask("HermesPurpleAPI")
         self._definir_rotas()
 
+    def _recusar_token_na_url(self, endpoint):
+        """Devolve uma resposta 403 se o pedido trouxer o token na query string.
+
+        Um token na URL fica no historico do browser, no cabecalho Referer
+        enviado a terceiros e nos logs de acesso do servidor - ou seja,
+        sobrevive ao pedido. Por isso nao e aceite em rota nenhuma: nem nas
+        autenticadas, nem na casca do dashboard (onde seria inerte, mas
+        continuaria a ser registado em logs). Devolve None quando o pedido
+        nao traz token na URL.
+        """
+        if request.args.get("token") is None:
+            return None
+
+        self.api_logger.log_acesso_negado(
+            endpoint,
+            "Token recusado na query string (usar o cabecalho X-Hermes-Token)",
+        )
+        if getattr(self, "alerts", None) is not None:
+            self.alerts.emitir_alerta(
+                severidade="MEDIO",
+                origem="purple_api",
+                descricao=f"Pedido com token na URL recusado em {endpoint}",
+                contexto={"endpoint": endpoint, "ip": request.remote_addr},
+            )
+        return jsonify({
+            "erro": "Token na URL nao e aceite. Usa o cabecalho X-Hermes-Token."
+        }), 403
+
     def _require_token(self, func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            token = request.headers.get("X-Hermes-Token") or request.args.get("token")
             ip = request.remote_addr
             endpoint = request.path
+
+            recusa = self._recusar_token_na_url(endpoint)
+            if recusa is not None:
+                return recusa
+
+            token = request.headers.get("X-Hermes-Token")
 
             self.api_logger.log_chamada(
                 endpoint=endpoint,
@@ -187,13 +220,23 @@ class PurpleAPI:
             return self._responder("/dashboard", dados)
 
         @self.app.route("/dashboard/view", methods=["GET"])
-        @self._require_token
         def dashboard_view():
+            """
+            Serve apenas a "casca" da pagina do dashboard: HTML e JavaScript,
+            sem dados e sem token lá dentro. Os dados continuam a vir de
+            /dashboard, que exige o cabecalho com o token. Como a casca nao
+            expoe nada, pode ser servida sem autenticacao - e e o que permite
+            abrir o dashboard no browser (uma navegacao nao consegue enviar
+            cabecalhos) sem voltar a por o token na URL.
+            """
             if self.dashboard is None:
                 return "<h1>Dashboard não está configurado.</h1>", 501
 
-            token = request.args.get("token", "")
-            return Response(_DASHBOARD_HTML.replace("__TOKEN__", token), mimetype="text/html")
+            recusa = self._recusar_token_na_url(request.path)
+            if recusa is not None:
+                return recusa
+
+            return Response(_DASHBOARD_HTML, mimetype="text/html")
 
         @self.app.route("/run_tool", methods=["POST"])
         @self._require_token
@@ -330,6 +373,16 @@ _DASHBOARD_HTML = """
 <h1>Hermes — Dashboard PURPLE</h1>
 <div class="sub">Atualiza automaticamente a cada 5s · <span id="ultima-atualizacao" class="status">a carregar...</span></div>
 
+<div class="card" id="login" style="margin-bottom:24px; display:none;">
+  <h2>Token de acesso</h2>
+  <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+    <input id="token-input" type="password" autocomplete="off" placeholder="cola aqui o token que o Hermes mostrou no terminal"
+           style="background:#0f1117; color:#e6e6e6; border:1px solid #30363d; padding:8px; border-radius:6px; flex:1; min-width:240px;">
+    <button id="token-entrar" style="background:#238636; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer;">Entrar</button>
+  </div>
+  <div id="token-msg" style="font-size:0.8rem; color:#f85149; margin-top:6px;"></div>
+</div>
+
 <div class="grid" id="cartoes"></div>
 
 <h2 style="color:#8b949e; font-size:0.9rem;">Run a tool</h2>
@@ -362,13 +415,60 @@ _DASHBOARD_HTML = """
 </table>
 
 <script>
-const TOKEN = "__TOKEN__";
+// O token vem do terminal (hermes_cli.py) e fica em sessionStorage: dura o
+// tempo da aba aberta e nunca vai para a URL, para o historico ou para os logs.
+let TOKEN = sessionStorage.getItem("hermes_token") || "";
+
+function mostrarLogin() {
+  document.getElementById("login").style.display = "block";
+  document.getElementById("token-input").focus();
+}
+
+function esconderLogin() {
+  document.getElementById("login").style.display = "none";
+  document.getElementById("token-msg").textContent = "";
+}
+
+async function entrar() {
+  const campo = document.getElementById("token-input");
+  const valor = campo.value.trim();
+  if (!valor) return;
+  TOKEN = valor;
+  const ok = await atualizar();
+  if (ok) {
+    sessionStorage.setItem("hermes_token", valor);
+    campo.value = "";
+    esconderLogin();
+  } else {
+    TOKEN = "";
+    document.getElementById("token-msg").textContent = "Token inválido.";
+  }
+}
+
+document.getElementById("token-entrar").addEventListener("click", entrar);
+document.getElementById("token-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") entrar();
+});
 
 async function atualizar() {
+  if (!TOKEN) {
+    document.getElementById("ultima-atualizacao").textContent = "sem token";
+    mostrarLogin();
+    return false;
+  }
   try {
     const r = await fetch("/dashboard", {
       headers: {"X-Hermes-Token": TOKEN},
     });
+    if (!r.ok) {
+      if (r.status === 403) {
+        sessionStorage.removeItem("hermes_token");
+        TOKEN = "";
+        mostrarLogin();
+      }
+      document.getElementById("ultima-atualizacao").textContent = "erro a atualizar: HTTP " + r.status;
+      return false;
+    }
     const d = await r.json();
 
     const metricas = d.metricas || {};
@@ -405,8 +505,10 @@ async function atualizar() {
 
     document.getElementById("tabela-alertas").querySelector("tbody").innerHTML = corpo;
     document.getElementById("ultima-atualizacao").textContent = "última atualização: " + new Date().toLocaleTimeString();
+    return true;
   } catch (e) {
     document.getElementById("ultima-atualizacao").textContent = "erro a atualizar: " + e;
+    return false;
   }
 }
 
@@ -428,6 +530,10 @@ document.getElementById("ferramenta").addEventListener("change", () => {
 });
 
 document.getElementById("btn-correr").addEventListener("click", async () => {
+  if (!TOKEN) {
+    mostrarLogin();
+    return;
+  }
   const tool = document.getElementById("ferramenta").value;
   const target = document.getElementById("alvo").value;
   const resultadoEl = document.getElementById("resultado-correr");

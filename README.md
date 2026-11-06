@@ -79,9 +79,9 @@ cp config/intelligence_config.example.json config/intelligence_config.json
 python3 hermes_cli.py
 ```
 
-This starts the PURPLE service (API, background monitoring, dashboard) and opens the dashboard in a Firefox **private window**. From there, pick a tool, set a target, and run it. Run the tests with `pytest tests/`.
+This starts the PURPLE service (API, background monitoring, dashboard) and opens the dashboard in your default browser. The terminal prints the access token: paste it in the dashboard once per tab. The page keeps it in `sessionStorage` and sends it in the `X-Hermes-Token` header — the token is never put in the URL. Run the tests with `pytest tests/`.
 
-**Why a private window:** API calls authenticate with an `X-Hermes-Token` header, and the initial page load carries the token in the URL (a browser navigation cannot set headers). Some privacy extensions block requests shaped this way, and the dashboard then fails with a generic "NetworkError"; a private window, where extensions are normally disabled, avoids that. If Firefox is not installed, Hermes falls back to your default browser and prints the URL.
+**Why the prompt:** API calls authenticate with an `X-Hermes-Token` header, and a browser navigation cannot set headers. Earlier versions therefore carried the token in the URL on the first load, which leaked it into the browser history, the `Referer` header and the server access logs, and needed a private window to dodge privacy extensions that block such requests. The dashboard is now served as a data-free shell and asks for the token, so a normal window works and the token never touches the URL. Requests that still carry `?token=` are refused with `403` and logged as an alert (see `SECURITY.md`).
 
 ## Known limitations
 

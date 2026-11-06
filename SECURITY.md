@@ -6,16 +6,23 @@ and what is (and isn't) covered by automated tests.
 ## Authentication
 
 The PURPLE API is protected by a random token stored in
-`config/purple_auth.json` and sent in the `X-Hermes-Token` request header. The
-initial dashboard page load (`/dashboard/view`) passes it in the URL query
-string instead, because a browser navigation cannot set headers; this is a
-known, accepted limitation.
+`config/purple_auth.json` and sent **only** in the `X-Hermes-Token` request
+header.
 
 - **Token generation:** the initial token is generated with
   `secrets.token_hex(32)` (a cryptographically random 256-bit value), created
   fresh on first run. It is never derived from a fixed or guessable string.
 - **Token comparison:** token validation uses `hmac.compare_digest()`, a
   constant-time comparison, to avoid timing-based side-channel attacks.
+- **No token in the URL.** `/dashboard/view` is served as a shell: HTML and
+  JavaScript only, no data and no token embedded. The operator pastes the token
+  the CLI prints, and the page keeps it in `sessionStorage` for the lifetime of
+  the tab. Any request carrying `?token=` is refused with `403` and recorded as
+  a `MEDIO` alert in the PURPLE alert log, so an old client cannot silently
+  fall back to the query-string path. An earlier version of this file described
+  the URL token as "a known, accepted limitation" — it is now removed, because
+  a token in the URL survives the request: it lands in the browser history, in
+  the `Referer` sent to third parties, and in the server access logs.
 - **Network exposure:** the API binds to `127.0.0.1` only. It is not reachable
   from other devices on the local network or from the internet, even if the
   host machine has other services exposed.
@@ -69,6 +76,10 @@ just manual verification:
 - `test_intelligence_service.py` — `mission_target` always overrides any
   target the AI proposes, both for the default value and for an explicit
   user-supplied one.
+- `test_purple_auth.py` — the token is accepted in the `X-Hermes-Token` header
+  and refused everywhere else: no token, wrong token, and a valid token in the
+  query string all return `403`; the URL token is never copied into the API
+  log, and a request with `?token=` is recorded as an alert.
 
 These tests run with `pytest tests/` and are intended to keep failing loudly
 if any of these invariants ever regresses, rather than relying on the author
