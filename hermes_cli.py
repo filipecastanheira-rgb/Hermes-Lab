@@ -29,11 +29,20 @@ def main():
     time.sleep(2)
 
     porta = runner.config.obter("api_port") or 5000
-    token = runner.auth.auth["token"]
     url = f"http://localhost:{porta}/dashboard/view"
     print(f"[Hermes] Dashboard: {url}")
-    print("[Hermes] Token de acesso (cola-o no dashboard; nao vai para a URL):")
-    print(f"[Hermes]   {token}")
+
+    # Os tokens sao guardados apenas como resumo: o valor em claro so existe
+    # no momento em que e criado. Por isso so o mostramos quando acabou de
+    # nascer (primeiro arranque) - depois disso, usa o que guardaste.
+    if runner.auth.token_inicial:
+        print("[Hermes] Token criado agora. Guarda-o: nao volta a ser mostrado.")
+        print(f"[Hermes]   {runner.auth.token_inicial}")
+    else:
+        nomes = ", ".join(t["nome"] for t in runner.auth.listar()) or "(nenhum)"
+        print(f"[Hermes] Tokens configurados: {nomes}")
+        print("[Hermes] Usa o token que guardaste. Para emitir outro: POST /token/regenerar.")
+
     abrir_dashboard(url)
 
     try:

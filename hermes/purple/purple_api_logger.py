@@ -55,10 +55,11 @@ class PurpleAPILogger:
     # ============================================================
     # Auditoria de chamadas
     # ============================================================
-    def log_chamada(self, endpoint, metodo, token, payload):
+    def log_chamada(self, endpoint, metodo, token, payload, utilizador=None):
         self._escrever("chamada", {
             "endpoint": endpoint,
             "metodo": metodo,
+            "utilizador": utilizador,
             "token_ref": token_ref(token),
             "payload": payload
         })

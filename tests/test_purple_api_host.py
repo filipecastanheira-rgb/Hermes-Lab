@@ -17,7 +17,7 @@ class FakeAlerts:
 
 class FakeAuth:
     def validar(self, recebido):
-        return recebido == "bom"
+        return {"id": "id-de-teste", "nome": "bom"} if recebido == "bom" else None
 
 
 class FakeApiLogger:

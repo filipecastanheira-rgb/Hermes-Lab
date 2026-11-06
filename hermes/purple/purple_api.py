@@ -152,9 +152,13 @@ class PurpleAPI:
                 self.api_logger.log_acesso_negado(endpoint, "Rate limit do token excedido")
                 return jsonify({"erro": "Rate limit excedido para este token"}), 429
 
-            if not token or not self.auth.validar(token):
+            identidade = self.auth.validar(token) if token else None
+            if identidade is None:
                 self.api_logger.log_erro_autenticacao(endpoint, token)
                 return jsonify({"erro": "Token inválido ou ausente"}), 403
+
+            # Quem fez o pedido, para o log e para as rotas que precisam de o saber
+            request.environ["hermes.token"] = identidade
 
             # So os pedidos autenticados ficam registados como "chamada": um
             # pedido rejeitado ja fica em erro_autenticacao/acesso_negado, e o
@@ -165,6 +169,7 @@ class PurpleAPI:
                 metodo=request.method,
                 token=token,
                 payload=request.json if request.is_json else {},
+                utilizador=identidade.get("nome"),
             )
 
             return func(*args, **kwargs)
@@ -271,18 +276,26 @@ class PurpleAPI:
         @self.app.route("/token/regenerar", methods=["POST"])
         @self._require_token
         def regenerar_token():
-            dados = request.json or {}
-            base = dados.get("base", "hermes-default")
+            """Revoga o token apresentado e emite um novo com o mesmo nome.
 
-            novo_token = self.auth.atualizar_token(base)
+            O token e gerado pelo servidor com secrets.token_hex(32). A versao
+            anterior aceitava uma "base" do chamador (por omissao
+            "hermes-default") e calculava sha256(base): o token resultante era
+            previsivel e publico, porque a base por omissao esta no codigo.
+
+            A resposta nao passa por _responder(): esse caminho escreve a
+            resposta no log, e o token novo iria para o ficheiro de log.
+            """
+            identidade = request.environ.get("hermes.token") or {}
+            novo_token = self.auth.regenerar(identidade.get("id"))
+            if novo_token is None:
+                return jsonify({"erro": "Token desconhecido."}), 404
+
             self.api_logger.log_token_regenerado(novo_token)
-
-            resposta = {"novo_token": novo_token}
-
-            return self._responder(
-                "/token/regenerar", resposta,
-                webhook_evento={"tipo": "token", "descricao": "Token regenerado via API PURPLE"},
-            )
+            return jsonify({
+                "novo_token": novo_token,
+                "aviso": "Guarda este token agora: nao volta a ser mostrado.",
+            }), 200
 
         @self.app.route("/dashboard", methods=["GET"])
         @self._require_token

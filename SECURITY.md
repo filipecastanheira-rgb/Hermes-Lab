@@ -5,15 +5,33 @@ and what is (and isn't) covered by automated tests.
 
 ## Authentication
 
-The PURPLE API is protected by a random token stored in
-`config/purple_auth.json` and sent **only** in the `X-Hermes-Token` request
-header.
+The PURPLE API is protected by tokens sent **only** in the `X-Hermes-Token`
+request header. `config/purple_auth.json` stores **only their SHA-256 hashes**
+(format 2): the clear token exists at the moment it is created and is shown
+once. A file read by mistake — a backup, a copy shared for debugging, a synced
+folder — no longer grants access.
 
-- **Token generation:** the initial token is generated with
-  `secrets.token_hex(32)` (a cryptographically random 256-bit value), created
-  fresh on first run. It is never derived from a fixed or guessable string.
-- **Token comparison:** token validation uses `hmac.compare_digest()`, a
-  constant-time comparison, to avoid timing-based side-channel attacks.
+- **One token per person or device.** Tokens carry a name and an id, so access
+  can be given to someone else and revoked individually, and every log entry
+  records which token (`utilizador`) made the call.
+- **Token generation:** `secrets.token_hex(32)` — a cryptographically random
+  256-bit value, always generated server-side. There is no caller-supplied
+  "base" and no derivation from a fixed string.
+- **Token comparison:** `hmac.compare_digest()` over every stored hash, so the
+  response time does not reveal which token failed (or that any did).
+- **Recovery:** if a token is lost, delete `config/purple_auth.json`; the next
+  start generates a new one and prints it once. `POST /token/regenerar` revokes
+  the presented token and issues a replacement with the same name.
+- **Migration:** a format-1 file (clear token) is converted automatically on
+  first load; the existing token keeps working, now stored as a hash.
+
+  An earlier version of this file claimed that the publicly computable
+  `sha256("hermes-default")` token had been found and fixed before release. The
+  fix had been applied to **initial generation only**: the rotation route still
+  defaulted to that base, so `POST /token/regenerar` with no body set the token
+  to a value printed in this document's source. That path is now gone, and the
+  rotation always generates a fresh random value.
+
 - **No token in the URL.** `/dashboard/view` is served as a shell: HTML and
   JavaScript only, no data and no token embedded. The operator pastes the token
   the CLI prints, and the page keeps it in `sessionStorage` for the lifetime of

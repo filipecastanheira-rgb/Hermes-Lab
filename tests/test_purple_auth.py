@@ -20,7 +20,7 @@ class FakeAuth:
 
     def validar(self, recebido):
         self.recebidos.append(recebido)
-        return recebido == TOKEN
+        return {"id": "id-de-teste", "nome": "teste"} if recebido == TOKEN else None
 
 
 class FakeApiLogger:
@@ -29,7 +29,7 @@ class FakeApiLogger:
         self.negados = []
         self.falhas_auth = []
 
-    def log_chamada(self, endpoint, metodo, token, payload):
+    def log_chamada(self, endpoint, metodo, token, payload, utilizador=None):
         self.chamadas.append({"endpoint": endpoint, "metodo": metodo, "token": token})
 
     def log_acesso_negado(self, endpoint, motivo):
