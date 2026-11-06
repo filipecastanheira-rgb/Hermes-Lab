@@ -10,6 +10,32 @@ from functools import wraps
 # a este servidor mas traz esse dominio no cabecalho Host.
 HOSTS_LOCAIS = {"127.0.0.1", "localhost", "::1"}
 
+# Endereco de bind da API. E uma invariante, nao um parametro: a app nunca
+# deve ficar exposta na rede, mesmo que a maquina tenha ligacao a internet.
+# Fica aqui como constante e passa por `endereco_bind()` no arranque, para que
+# uma alteracao descuidada falhe de imediato em vez de expor o servico.
+HOST_BIND = "127.0.0.1"
+BINDS_PERMITIDOS = {"127.0.0.1", "::1"}
+
+
+def endereco_bind(host=None):
+    """Devolve o endereco de bind, recusando qualquer coisa que nao seja loopback.
+
+    Aceita apenas enderecos literais de loopback - nao aceita `localhost`,
+    porque o nome depende do resolver e do /etc/hosts, enquanto 127.0.0.1 nao
+    depende de nada. Falha com ValueError em vez de arrancar exposto: um erro
+    no arranque e um incidente visivel, um bind em 0.0.0.0 e um incidente
+    silencioso.
+    """
+    alvo = HOST_BIND if host is None else host
+    if alvo not in BINDS_PERMITIDOS:
+        raise ValueError(
+            f"Bind recusado: {alvo!r}. A API PURPLE so pode escutar em loopback "
+            f"({', '.join(sorted(BINDS_PERMITIDOS))}). Para expor o servico na rede "
+            "seria preciso alterar esta invariante de proposito."
+        )
+    return alvo
+
 
 def host_permitido(host_header):
     """True se o cabecalho Host aponta para um nome local.
@@ -112,6 +138,12 @@ class PurpleAPI:
 
             token = request.headers.get("X-Hermes-Token")
 
+            # Nota: localmente o cliente e sempre 127.0.0.1, portanto este
+            # limite "por IP" funciona na pratica como um limite GLOBAL. E o
+            # comportamento pretendido: um servico que so tem um cliente local
+            # quer proteger-se de um cliente descontrolado (um bug que dispara
+            # pedidos em ciclo), nao de um ataque distribuido. O limite por
+            # token e que distingue clientes entre si.
             if not self.ratelimit.verificar_ip(ip):
                 self.api_logger.log_acesso_negado(endpoint, f"Rate limit IP excedido ({ip})")
                 return jsonify({"erro": "Rate limit excedido para este IP"}), 429
@@ -387,7 +419,7 @@ class PurpleAPI:
         # pedidos, incluindo o polling do dashboard a cada 5s. Confirmado
         # como causa provavel de erros de rede no browser durante execucoes
         # longas.
-        self.app.run(host="127.0.0.1", port=porta, use_reloader=False, threaded=True)
+        self.app.run(host=endereco_bind(), port=porta, use_reloader=False, threaded=True)
 
 
 _DASHBOARD_HTML = """

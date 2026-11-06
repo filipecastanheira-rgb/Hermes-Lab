@@ -23,9 +23,18 @@ header.
   the URL token as "a known, accepted limitation" — it is now removed, because
   a token in the URL survives the request: it lands in the browser history, in
   the `Referer` sent to third parties, and in the server access logs.
-- **Network exposure:** the API binds to `127.0.0.1` only. It is not reachable
-  from other devices on the local network or from the internet, even if the
-  host machine has other services exposed.
+- **Network exposure:** the API binds to `127.0.0.1` only, and that is enforced
+  in code rather than configuration: `endereco_bind()` refuses anything that is
+  not a literal loopback address, so one careless edit — or a tool rewriting
+  the file — fails at startup instead of exposing the service on a machine that
+  has internet access. It is not reachable from other devices on the local
+  network or from the internet, even if the host machine has other services
+  exposed.
+- **Rate limiting:** requests are limited per token and per client address. On a
+  loopback-only service every client shares the address `127.0.0.1`, so the
+  address limit works as a **global** bucket. That is deliberate: it protects
+  against a runaway local client (a bug that fires requests in a loop), while
+  the per-token limit is what tells clients apart.
 - **Host header validation:** only `127.0.0.1`, `localhost` and `::1` are
   accepted, with or without a port. Anything else is refused with `400` before
   authentication runs. This closes the DNS-rebinding path, where a domain
