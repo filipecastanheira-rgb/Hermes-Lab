@@ -26,6 +26,12 @@ header.
 - **Network exposure:** the API binds to `127.0.0.1` only. It is not reachable
   from other devices on the local network or from the internet, even if the
   host machine has other services exposed.
+- **Host header validation:** only `127.0.0.1`, `localhost` and `::1` are
+  accepted, with or without a port. Anything else is refused with `400` before
+  authentication runs. This closes the DNS-rebinding path, where a domain
+  controlled by an attacker resolves to `127.0.0.1` and the victim's browser
+  then sends that domain in the `Host` header, making the local API reachable
+  from a page on the internet.
 
 ## Tokens in logs and persisted state
 
@@ -102,6 +108,9 @@ just manual verification:
 - `test_purple_api_logger.py` — no code path writes a token in clear: calls,
   authentication failures, token rotation and the rate-limit state file all
   store only `token_ref`.
+- `test_purple_api_host.py` — local names are accepted, foreign and
+  suffix-spoofed names (`localhost.evil.com`, `127.0.0.1.nip.io`) are refused
+  with `400`, and the refusal happens before authentication.
 
 These tests run with `pytest tests/` and are intended to keep failing loudly
 if any of these invariants ever regresses, rather than relying on the author

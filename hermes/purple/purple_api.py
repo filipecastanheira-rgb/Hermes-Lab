@@ -4,6 +4,29 @@ from hermes.tools.agregador_ferramentas import ler_uma_vez_todas
 from hermes.core.lab_boundary import alvo_permitido
 from functools import wraps
 
+# Nomes pelos quais a app se pode apresentar. So estes: a API nao foi feita
+# para ser acedida por nome nenhum, e o browser de um atacante pode resolver
+# um dominio dele para 127.0.0.1 (DNS rebinding) - nesse caso o pedido chega
+# a este servidor mas traz esse dominio no cabecalho Host.
+HOSTS_LOCAIS = {"127.0.0.1", "localhost", "::1"}
+
+
+def host_permitido(host_header):
+    """True se o cabecalho Host aponta para um nome local.
+
+    Aceita o nome com ou sem porta, e o IPv6 entre parenteses retos
+    (`[::1]:5000`). A comparacao e pelo nome completo: `localhost.evil.com`
+    nao passa, porque nao e comparado por prefixo.
+    """
+    if not host_header:
+        return False
+    h = host_header.strip().lower()
+    if h.startswith("["):                 # [::1] ou [::1]:5000
+        h = h[1:].split("]", 1)[0]
+    elif h.count(":") == 1:               # nome ou IPv4 com porta
+        h = h.rsplit(":", 1)[0]
+    return h in HOSTS_LOCAIS
+
 
 class PurpleAPI:
     """
@@ -32,6 +55,21 @@ class PurpleAPI:
         self.dashboard = dashboard
 
         self.app = Flask("HermesPurpleAPI")
+
+        @self.app.before_request
+        def _validar_host():
+            """Recusa pedidos cujo Host nao seja um nome local (DNS rebinding).
+
+            Um dominio controlado pelo atacante que resolva para 127.0.0.1 faz
+            o browser enviar esse dominio no Host: o pedido chega ao servidor
+            a partir da maquina da vitima, com o token dela. Rejeitar Hosts
+            desconhecidos fecha essa via sem depender de como o browser trata
+            o Same-Origin Policy.
+            """
+            if not host_permitido(request.headers.get("Host", "")):
+                return Response("Host nao permitido", status=400, mimetype="text/plain")
+            return None
+
         self._definir_rotas()
 
     def _recusar_token_na_url(self, endpoint):
