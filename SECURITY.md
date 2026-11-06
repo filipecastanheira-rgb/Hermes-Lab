@@ -5,8 +5,9 @@ and what is (and isn't) covered by automated tests.
 
 ## Authentication
 
-The PURPLE API is protected by tokens sent **only** in the `X-Hermes-Token`
-request header. `config/purple_auth.json` stores **only their SHA-256 hashes**
+The PURPLE API accepts two credentials: an HttpOnly session cookie, minted for the
+local operator at startup, or a token sent in the `X-Hermes-Token` request header
+(phone, other machines, scripts). `config/purple_auth.json` stores **only their SHA-256 hashes**
 (format 2): the clear token exists at the moment it is created and is shown
 once. A file read by mistake — a backup, a copy shared for debugging, a synced
 folder — no longer grants access.
@@ -33,9 +34,9 @@ folder — no longer grants access.
   rotation always generates a fresh random value.
 
 - **No token in the URL.** `/dashboard/view` is served as a shell: HTML and
-  JavaScript only, no data and no token embedded. The operator pastes the token
-  the CLI prints, and the page keeps it in `sessionStorage` for the lifetime of
-  the tab. Any request carrying `?token=` is refused with `403` and recorded as
+  JavaScript only, no data and no token embedded. Locally the page signs in with a single-use nonce (see *Local
+  sign-in*); remote clients send `X-Hermes-Token`, and the page keeps a pasted
+  token in `sessionStorage` for the lifetime of the tab. Any request carrying `?token=` is refused with `403` and recorded as
   a `MEDIO` alert in the PURPLE alert log, so an old client cannot silently
   fall back to the query-string path. An earlier version of this file described
   the URL token as "a known, accepted limitation" — it is now removed, because
@@ -60,6 +61,38 @@ folder — no longer grants access.
   then sends that domain in the `Host` header, making the local API reachable
   from a page on the internet.
 
+### Local sign-in (no token to keep)
+
+Opening the dashboard locally used to require a token, which then had to live
+somewhere — a file, a password manager, or nowhere and the operator got locked
+out. None of that is a security control; it is friction.
+
+- The CLI generates a **single-use nonce** (60 s TTL, in memory only) and opens
+  `/dashboard/view#n=<nonce>`.
+- A URL **fragment** is never sent to the server, never appears in the
+  `Referer`, and never reaches access logs. The page trades the nonce for an
+  `HttpOnly; SameSite=Strict` session cookie and strips it from the URL with
+  `history.replaceState`.
+- The nonce is **consumed by the first attempt even if that attempt fails**, so
+  it cannot be guessed by repetition. It is also refused from non-loopback
+  addresses.
+- Sessions live in the server's memory: restarting Hermes invalidates them, and
+  the CLI opens a fresh nonce on every start. `POST /auth/logout` revokes one.
+- Tokens (tema 5) are unchanged and remain the way in for the phone, for other
+  machines, and for the friends who will be given access.
+
+The private window is still how Hermes opens the dashboard, and for a
+functional reason: dashboard requests to the local API fail in a normal window
+on the development machine (the tool buttons answer `NetworkError`), and
+extensions are disabled in a private window. It is no longer a token measure -
+the token does not travel in the URL, and the session cookie works in either
+kind of window.
+
+Residual exposure, stated plainly: a local process running as the same user
+could race the browser for the nonce during its 60 s window, and could read the
+browser profile anyway. The trust boundary here is the operating-system user,
+not the file.
+
 ## Tokens in logs and persisted state
 
 The API log (`logs/purple_api.log`) and the rate-limit state
@@ -83,6 +116,18 @@ An earlier version of this project generated the initial token as
 `sha256("hermes-default")` — a fixed, publicly computable value for anyone
 reading the source code. This was found and fixed before the project's public
 release, and is the reason the two points above exist.
+
+### No HTML is built from data
+
+The dashboard renders alert descriptions, signature names and interface names
+that originate outside Hermes (Suricata rules, log paths, remote banners). An
+earlier version interpolated them into `innerHTML`: a crafted signature was
+stored XSS inside an authenticated page. The page now builds every node with
+`textContent`/`createElement`, so the data is data.
+
+This matters more with a cookie session than it did with a header token: an
+injected script cannot read an `HttpOnly` cookie, but it can issue requests in
+the page's context while the tab is open.
 
 ## The lab_boundary invariant
 

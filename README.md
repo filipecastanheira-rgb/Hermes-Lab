@@ -79,9 +79,18 @@ cp config/intelligence_config.example.json config/intelligence_config.json
 python3 hermes_cli.py
 ```
 
-This starts the PURPLE service (API, background monitoring, dashboard) and opens the dashboard in your default browser. The terminal prints the access token: paste it in the dashboard once per tab. The page keeps it in `sessionStorage` and sends it in the `X-Hermes-Token` header — the token is never put in the URL. Run the tests with `pytest tests/`.
+This starts the PURPLE service (API, background monitoring, dashboard) and opens the dashboard in your default browser, already signed in: the CLI generates a single-use nonce and puts it in the URL fragment, which the page trades for an `HttpOnly` session cookie. Nothing to paste, nothing to store, and nothing in the URL that reaches the server. Tokens exist for clients that are not this machine — the phone, another host, a script — and are sent in the `X-Hermes-Token` header. Run the tests with `pytest tests/`.
 
-**Why the prompt:** API calls authenticate with an `X-Hermes-Token` header, and a browser navigation cannot set headers. Earlier versions therefore carried the token in the URL on the first load, which leaked it into the browser history, the `Referer` header and the server access logs, and needed a private window to dodge privacy extensions that block such requests. The dashboard is now served as a data-free shell and asks for the token, so a normal window works and the token never touches the URL. Requests that still carry `?token=` are refused with `403` and logged as an alert (see `SECURITY.md`).
+**Why a private window:** Hermes opens the dashboard with `firefox --private-window`.
+This is a functional requirement, not a security one. Requests from the dashboard to the
+local API fail in a normal window on this system, and the visible symptom is the tool
+buttons (nmap, Zeek, Suricata) answering `NetworkError`; in a private window extensions
+are disabled and those requests go through. It is also not a token measure any more: the
+token is no longer in the URL, and the page signs in with a single-use nonce.
+
+So the private window stays as the default, with the reason written down. If Firefox is
+not installed, Hermes falls back to the default browser and prints the URL - in that case
+the tools may need the URL opened manually in a private window.
 
 ## Known limitations
 

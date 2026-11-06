@@ -1,3 +1,7 @@
+import hmac
+import secrets
+import time
+
 from flask import Flask, request, jsonify, Response
 
 from hermes.tools.agregador_ferramentas import ler_uma_vez_todas
@@ -35,6 +39,62 @@ def endereco_bind(host=None):
             "seria preciso alterar esta invariante de proposito."
         )
     return alvo
+
+
+def _loopback(ip):
+    return (ip or "") in {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
+
+
+class Bootstrap:
+    """Entrada sem token para o dono, a partir da propria maquina.
+
+    O CLI gera um nonce de uso unico, valido TTL segundos, e abre o browser com
+    esse nonce no fragmento do URL (#n=...). O fragmento nao e enviado ao
+    servidor, nao vai no Referer e nao aparece nos logs de acesso. O JavaScript
+    troca-o por uma cookie HttpOnly e apaga-o do URL.
+
+    Nada disto passa por disco: o nonce e as sessoes vivem em memoria e morrem
+    com o processo. Reiniciar o servidor obriga a um novo arranque - o que o
+    CLI faz de qualquer forma, porque e ele que abre o browser.
+    """
+
+    TTL = 60
+
+    def __init__(self):
+        self.nonce = None
+        self.emitido_em = 0.0
+        self.usado = True
+        self.sessoes = {}
+
+    def novo_nonce(self):
+        self.nonce = secrets.token_hex(32)
+        self.emitido_em = time.time()
+        self.usado = False
+        return self.nonce
+
+    def trocar(self, nonce, ip):
+        """Devolve um id de sessao novo, ou None.
+
+        O nonce e consumido no primeiro uso, mesmo que a validacao falhe: um
+        nonce que sobrevive a uma tentativa errada e um nonce que se pode
+        continuar a tentar.
+        """
+        if self.usado or not self.nonce:
+            return None
+        igual = hmac.compare_digest(str(nonce or ""), self.nonce)
+        expirado = (time.time() - self.emitido_em) > self.TTL
+        self.usado = True
+        if not igual or expirado or not _loopback(ip):
+            return None
+        sid = secrets.token_hex(32)
+        self.sessoes[sid] = {"criada_em": time.time()}
+        return sid
+
+    def sessao_valida(self, sid):
+        return bool(sid) and sid in self.sessoes
+
+    def revogar(self, sid):
+        return self.sessoes.pop(sid, None) is not None
 
 
 def host_permitido(host_header):
@@ -80,6 +140,7 @@ class PurpleAPI:
         self.webhooks = webhooks
         self.dashboard = dashboard
 
+        self.bootstrap = Bootstrap()
         self.app = Flask("HermesPurpleAPI")
 
         @self.app.before_request
@@ -152,7 +213,11 @@ class PurpleAPI:
                 self.api_logger.log_acesso_negado(endpoint, "Rate limit do token excedido")
                 return jsonify({"erro": "Rate limit excedido para este token"}), 429
 
-            identidade = self.auth.validar(token) if token else None
+            sid = request.cookies.get("hermes_session")
+            if sid and self.bootstrap.sessao_valida(sid):
+                identidade = {"id": "sessao-local", "nome": "local"}
+            else:
+                identidade = self.auth.validar(token) if token else None
             if identidade is None:
                 self.api_logger.log_erro_autenticacao(endpoint, token)
                 return jsonify({"erro": "Token inválido ou ausente"}), 403
@@ -198,6 +263,32 @@ class PurpleAPI:
         return jsonify(dados)
 
     def _definir_rotas(self):
+
+        @self.app.route("/auth/bootstrap", methods=["POST"])
+        def auth_bootstrap():
+            """Troca o nonce de arranque por uma cookie de sessao HttpOnly."""
+            dados = request.json or {}
+            sid = self.bootstrap.trocar(dados.get("nonce"), request.remote_addr)
+            if sid is None:
+                self.api_logger.log_acesso_negado(
+                    "/auth/bootstrap",
+                    "Nonce de arranque invalido, expirado ou ja usado",
+                )
+                return jsonify({"erro": "Nonce invalido."}), 403
+
+            resposta = jsonify({"ok": True})
+            resposta.set_cookie("hermes_session", sid, httponly=True, samesite="Strict", path="/")
+            self.api_logger.log_chamada(
+                "/auth/bootstrap", "POST", None, {}, utilizador="local",
+            )
+            return resposta
+
+        @self.app.route("/auth/logout", methods=["POST"])
+        def auth_logout():
+            self.bootstrap.revogar(request.cookies.get("hermes_session"))
+            resposta = jsonify({"ok": True})
+            resposta.delete_cookie("hermes_session", path="/")
+            return resposta
 
         @self.app.route("/status", methods=["GET"])
         @self._require_token
@@ -502,25 +593,71 @@ _DASHBOARD_HTML = """
 </table>
 
 <script>
-// O token vem do terminal (hermes_cli.py) e fica em sessionStorage: dura o
-// tempo da aba aberta e nunca vai para a URL, para o historico ou para os logs.
-let TOKEN = sessionStorage.getItem("hermes_token") || "";
+// Nenhum HTML e construido a partir de dados: descricoes de alertas, nomes de
+// assinaturas e nomes de interface vem de fora (Suricata, correlator, ficheiros
+// de log) e entram sempre por textContent. Com uma sessao por cookie, um
+// innerHTML aqui seria XSS armazenado com acesso directo a API.
+const $ = (id) => document.getElementById(id);
 
-function mostrarLogin() {
-  document.getElementById("login").style.display = "block";
-  document.getElementById("token-input").focus();
+let TOKEN = sessionStorage.getItem("hermes_token") || "";
+let SESSAO = false;
+
+function cartao(titulo, valor) {
+  const d = document.createElement("div");
+  d.className = "card";
+  const h = document.createElement("h2");
+  h.textContent = titulo;
+  const v = document.createElement("div");
+  v.className = "valor";
+  v.textContent = valor;
+  d.append(h, v);
+  return d;
+}
+
+function mostrarLogin(msg) {
+  $("login").style.display = "block";
+  $("token-msg").textContent = msg || "";
 }
 
 function esconderLogin() {
-  document.getElementById("login").style.display = "none";
-  document.getElementById("token-msg").textContent = "";
+  $("login").style.display = "none";
+  $("token-msg").textContent = "";
+}
+
+// O CLI abre a pagina com #n=<nonce>. O fragmento nunca chega ao servidor; e
+// trocado por uma cookie HttpOnly e apagado do URL antes de qualquer pedido.
+async function bootstrap() {
+  const m = location.hash.match(/^#n=([0-9a-f]{64})$/);
+  if (!m) return false;
+  history.replaceState(null, "", location.pathname + location.search);
+  try {
+    const r = await fetch("/auth/bootstrap", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({nonce: m[1]}),
+    });
+    return r.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+function pedir(url, opcoes = {}) {
+  const headers = Object.assign({}, opcoes.headers || {});
+  if (SESSAO) {
+    headers["Content-Type"] = headers["Content-Type"] || "application/json";
+  } else {
+    headers["X-Hermes-Token"] = TOKEN;
+  }
+  return fetch(url, Object.assign({}, opcoes, {headers}));
 }
 
 async function entrar() {
-  const campo = document.getElementById("token-input");
+  const campo = $("token-input");
   const valor = campo.value.trim();
   if (!valor) return;
   TOKEN = valor;
+  SESSAO = false;
   const ok = await atualizar();
   if (ok) {
     sessionStorage.setItem("hermes_token", valor);
@@ -528,73 +665,82 @@ async function entrar() {
     esconderLogin();
   } else {
     TOKEN = "";
-    document.getElementById("token-msg").textContent = "Token inválido.";
+    $("token-msg").textContent = "Token inválido.";
   }
 }
 
-document.getElementById("token-entrar").addEventListener("click", entrar);
-document.getElementById("token-input").addEventListener("keydown", (e) => {
+$("token-entrar").addEventListener("click", entrar);
+$("token-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter") entrar();
 });
 
 async function atualizar() {
-  if (!TOKEN) {
-    document.getElementById("ultima-atualizacao").textContent = "sem token";
-    mostrarLogin();
+  if (!SESSAO && !TOKEN) {
+    $("ultima-atualizacao").textContent = "sem sessão";
+    mostrarLogin("");
     return false;
   }
   try {
-    const r = await fetch("/dashboard", {
-      headers: {"X-Hermes-Token": TOKEN},
-    });
+    const r = await pedir("/dashboard");
     if (!r.ok) {
       if (r.status === 403) {
-        sessionStorage.removeItem("hermes_token");
+        SESSAO = false;
         TOKEN = "";
-        mostrarLogin();
+        sessionStorage.removeItem("hermes_token");
+        mostrarLogin("Sessão expirada. Cola o token ou reinicia o Hermes.");
       }
-      document.getElementById("ultima-atualizacao").textContent = "erro a atualizar: HTTP " + r.status;
+      $("ultima-atualizacao").textContent = "erro a atualizar: HTTP " + r.status;
       return false;
     }
     const d = await r.json();
-
     const metricas = d.metricas || {};
     const contadores = metricas.contadores || {};
     const alertas = d.alertas_recentes || [];
 
-    document.getElementById("cartoes").innerHTML = `
-      <div class="card"><h2>Status</h2><div class="valor" style="font-size:1.1rem;">${d.estado || "?"}</div></div>
-      <div class="card"><h2>Heartbeats PURPLE</h2><div class="valor">${contadores.heartbeat_purple || 0}</div></div>
-      <div class="card"><h2>Falhas de health-check</h2><div class="valor">${contadores.healthcheck_falha || 0}</div></div>
-      <div class="card"><h2>Operation</h2><div class="valor" style="font-size:1.1rem;">manual</div></div>
-    `;
+    $("cartoes").replaceChildren(
+      cartao("Status", d.estado || "?"),
+      cartao("Heartbeats PURPLE", contadores.heartbeat_purple || 0),
+      cartao("Falhas de health-check", contadores.healthcheck_falha || 0),
+      cartao("Operation", "manual")
+    );
 
-    const contagemOrigens = {};
-    alertas.forEach(a => {
-      const origem = a.origem || a.evento?.origem || "unknown";
-      contagemOrigens[origem] = (contagemOrigens[origem] || 0) + 1;
+    const contagem = new Map();
+    alertas.forEach((a) => {
+      const origem = a.origem || (a.evento && a.evento.origem) || "unknown";
+      contagem.set(origem, (contagem.get(origem) || 0) + 1);
     });
-    const origensHtml = Object.keys(contagemOrigens).length
-      ? Object.entries(contagemOrigens).map(([origem, n]) => `
-          <div class="card"><h2>${origem}</h2><div class="valor">${n}</div></div>
-        `).join("")
-      : `<div class="card"><h2>No data yet</h2><div class="valor" style="font-size:1rem;">-</div></div>`;
-    document.getElementById("origens").innerHTML = origensHtml;
+    const origens = [...contagem.entries()].map(([o, n]) => cartao(o, n));
+    $("origens").replaceChildren(...(origens.length ? origens : [cartao("No data yet", "-")]));
 
-    const corpo = alertas.length
-      ? alertas.slice(-20).reverse().map(a => `
-          <tr>
-            <td>${new Date((a.timestamp||0)*1000).toLocaleTimeString()}</td>
-            <td>${(a.origem || a.evento?.origem || "-")}</td>
-            <td>${(a.descricao || a.evento?.assinatura || JSON.stringify(a).slice(0,80))}</td>
-          </tr>`).join("")
-      : `<tr><td colspan="3" class="vazio">Sem alertas ainda.</td></tr>`;
+    const tbody = $("tabela-alertas").querySelector("tbody");
+    if (!alertas.length) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 3;
+      td.className = "vazio";
+      td.textContent = "Sem alertas ainda.";
+      tr.append(td);
+      tbody.replaceChildren(tr);
+    } else {
+      tbody.replaceChildren(
+        ...alertas.slice(-20).reverse().map((a) => {
+          const tr = document.createElement("tr");
+          const quando = document.createElement("td");
+          quando.textContent = new Date((a.timestamp || 0) * 1000).toLocaleTimeString();
+          const origem = document.createElement("td");
+          origem.textContent = a.origem || (a.evento && a.evento.origem) || "-";
+          const desc = document.createElement("td");
+          desc.textContent = a.descricao || (a.evento && a.evento.assinatura) || JSON.stringify(a).slice(0, 80);
+          tr.append(quando, origem, desc);
+          return tr;
+        })
+      );
+    }
 
-    document.getElementById("tabela-alertas").querySelector("tbody").innerHTML = corpo;
-    document.getElementById("ultima-atualizacao").textContent = "última atualização: " + new Date().toLocaleTimeString();
+    $("ultima-atualizacao").textContent = "última atualização: " + new Date().toLocaleTimeString();
     return true;
   } catch (e) {
-    document.getElementById("ultima-atualizacao").textContent = "erro a atualizar: " + e;
+    $("ultima-atualizacao").textContent = "erro a atualizar: " + e;
     return false;
   }
 }
@@ -602,10 +748,6 @@ async function atualizar() {
 document.getElementById("ferramenta").addEventListener("change", () => {
   const tool = document.getElementById("ferramenta").value;
   const alvoEl = document.getElementById("alvo");
-  // Cada tool espera um tipo de "alvo" diferente: nmap/openvas querem um
-  // IP; tshark quer uma interface de rede; suricata/zeek querem o
-  // caminho do ficheiro de log que leem (os mesmos caminhos usados na
-  // vigilancia continua de fundo, ver purple_runner.py).
   const valoresDefeito = {
     nmap: "127.0.0.1",
     openvas: "127.0.0.1",
@@ -617,8 +759,8 @@ document.getElementById("ferramenta").addEventListener("change", () => {
 });
 
 document.getElementById("btn-correr").addEventListener("click", async () => {
-  if (!TOKEN) {
-    mostrarLogin();
+  if (!SESSAO && !TOKEN) {
+    mostrarLogin("");
     return;
   }
   const tool = document.getElementById("ferramenta").value;
@@ -628,12 +770,12 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
 
   resultadoEl.textContent = "Running... (pode demorar ate 2 min, sobretudo para openvas)";
   resultadoEl.style.color = "#8b949e";
-  relatorioEl.innerHTML = `<div class="vazio">a gerar relatório...</div>`;
+  relatorioEl.textContent = "a gerar relatório...";
 
   try {
-    const r = await fetch("/run_tool", {
+    const r = await pedir("/run_tool", {
       method: "POST",
-      headers: {"Content-Type": "application/json", "X-Hermes-Token": TOKEN},
+      headers: {"Content-Type": "application/json"},
       body: JSON.stringify({tool, target}),
     });
     const d = await r.json();
@@ -641,9 +783,9 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
     if (!r.ok) {
       resultadoEl.textContent = d.error || "Blocked.";
       resultadoEl.style.color = "#f85149";
-      relatorioEl.innerHTML = `<div class="vazio">${d.error || "Bloqueado."}</div>`;
+      relatorioEl.textContent = d.error || "Bloqueado.";
     } else {
-      resultadoEl.textContent = `${d.events_found} event(s) found.`;
+      resultadoEl.textContent = d.events_found + " event(s) found.";
       resultadoEl.style.color = "#7ee787";
       relatorioEl.textContent = d.relatorio || "(sem relatório)";
       atualizar();
@@ -651,12 +793,21 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
   } catch (e) {
     resultadoEl.textContent = "Error: " + e;
     resultadoEl.style.color = "#f85149";
-    relatorioEl.innerHTML = `<div class="vazio">Erro: ${e}</div>`;
+    relatorioEl.textContent = "Erro: " + e;
   }
 });
 
-atualizar();
-setInterval(atualizar, 5000);
+(async () => {
+  SESSAO = await bootstrap();
+  if (!SESSAO && !TOKEN) {
+    mostrarLogin("");
+  } else {
+    esconderLogin();
+  }
+  atualizar();
+  setInterval(atualizar, 5000);
+})();
+
 </script>
 </body>
 </html>
