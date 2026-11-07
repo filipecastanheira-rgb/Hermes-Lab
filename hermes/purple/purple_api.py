@@ -265,6 +265,23 @@ class PurpleAPI:
                 self.api_logger.log_erro_autenticacao(endpoint, token)
                 return jsonify({"erro": "Token inválido ou ausente"}), 403
 
+            # Uma cookie viaja sozinha em qualquer pedido que o browser faca a
+            # este host, por isso um pedido que altera estado tem de provar que
+            # veio da propria pagina: o Origin tem de ser o deste servidor.
+            if identidade.get("id") == "sessao-local" and request.method not in ("GET", "HEAD", "OPTIONS"):
+                esperado = f"http://{request.host}"
+                if request.headers.get("Origin") != esperado:
+                    self.api_logger.log_acesso_negado(
+                        endpoint, "Origem inesperada num pedido autenticado por cookie")
+                    if getattr(self, "alerts", None) is not None:
+                        self.alerts.emitir_alerta(
+                            severidade="MEDIO",
+                            origem="purple_api",
+                            descricao=f"Pedido com cookie e Origin diferente recusado em {endpoint}",
+                            contexto={"endpoint": endpoint, "origem": request.headers.get("Origin")},
+                        )
+                    return jsonify({"erro": "Origem não permitida."}), 403
+
             # Quem fez o pedido, para o log e para as rotas que precisam de o saber
             request.environ["hermes.token"] = identidade
 

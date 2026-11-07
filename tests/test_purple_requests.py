@@ -92,3 +92,42 @@ def test_corpo_json_invalido_nao_da_400_vindo_do_logger():
 
     assert r.status_code == 200
     assert api.api_logger.chamadas[-1]["payload"] == {}
+
+
+def _rota_post(api):
+    from flask import Flask
+
+    app = Flask("teste")
+
+    def rota():
+        return {"ok": True}
+
+    app.add_url_rule("/x", "x", PurpleAPI._require_token(api, rota), methods=["POST"])
+    return app.test_client()
+
+
+def test_cookie_com_origem_estranha_em_post_e_recusada():
+    api = _api()
+    _client_with_session(api)
+    client = _rota_post(api)
+    client.set_cookie("hermes_session", list(api.bootstrap.sessoes)[0], domain="localhost")
+
+    r = client.post("/x", headers={"Origin": "http://evil.example"})
+
+    assert r.status_code == 403
+
+
+def test_cookie_com_a_origem_do_servidor_e_aceite():
+    api = _api()
+    _client_with_session(api)
+    client = _rota_post(api)
+    client.set_cookie("hermes_session", list(api.bootstrap.sessoes)[0], domain="localhost")
+
+    assert client.post("/x", headers={"Origin": "http://localhost"}).status_code == 200
+
+
+def test_token_sem_origem_continua_a_funcionar():
+    api = _api()
+    client = _rota_post(api)
+
+    assert client.post("/x", headers={"X-Hermes-Token": "bom"}).status_code == 200
