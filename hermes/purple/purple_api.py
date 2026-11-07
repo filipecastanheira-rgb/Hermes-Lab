@@ -229,11 +229,13 @@ class PurpleAPI:
             # pedido rejeitado ja fica em erro_autenticacao/acesso_negado, e o
             # corpo de um pedido nao autenticado (controlado por quem o envia)
             # nao deve ser copiado para o log.
+            # get_json(silent=True): an empty or malformed body must be logged as
+            # {}, never raise and turn the request into a 400.
             self.api_logger.log_chamada(
                 endpoint=endpoint,
                 metodo=request.method,
                 token=token,
-                payload=request.json if request.is_json else {},
+                payload=request.get_json(silent=True) or {},
                 utilizador=identidade.get("nome"),
             )
 
