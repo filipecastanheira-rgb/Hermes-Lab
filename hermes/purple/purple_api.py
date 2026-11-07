@@ -98,20 +98,36 @@ class Bootstrap:
 
 
 def host_permitido(host_header):
-    """True se o cabecalho Host aponta para um nome local.
+    """True only for a local name, with or without a port.
 
-    Aceita o nome com ou sem porta, e o IPv6 entre parenteses retos
-    (`[::1]:5000`). A comparacao e pelo nome completo: `localhost.evil.com`
-    nao passa, porque nao e comparado por prefixo.
+    The whole name is compared (never a prefix, so `localhost.evil.com` fails)
+    and a port, when present, must be digits only. An IPv6 literal has to be
+    bracketed, as RFC 3986 requires: `[::1]` or `[::1]:5000`. Any whitespace in
+    the value rejects the request instead of being tolerated.
     """
-    if not host_header:
+    if not host_header or any(c.isspace() for c in host_header):
         return False
-    h = host_header.strip().lower()
-    if h.startswith("["):                 # [::1] ou [::1]:5000
-        h = h[1:].split("]", 1)[0]
-    elif h.count(":") == 1:               # nome ou IPv4 com porta
-        h = h.rsplit(":", 1)[0]
-    return h in HOSTS_LOCAIS
+
+    h = host_header.lower()
+    porta = None
+
+    if h.startswith("["):
+        if "]" not in h:
+            return False
+        nome, resto = h[1:].split("]", 1)
+        if resto:
+            if not resto.startswith(":"):
+                return False
+            porta = resto[1:]
+    elif ":" in h:
+        nome, porta = h.rsplit(":", 1)
+    else:
+        nome = h
+
+    if porta is not None and (not porta.isdigit() or len(porta) > 5):
+        return False
+
+    return nome in HOSTS_LOCAIS
 
 
 class PurpleAPI:

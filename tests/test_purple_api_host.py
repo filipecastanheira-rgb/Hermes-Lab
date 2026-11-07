@@ -46,13 +46,20 @@ class FakeRateLimit:
     "127.0.0.1",
     "127.0.0.1:5000",
     "[::1]:5000",
-    "::1",
 ])
 def test_hosts_locais_sao_aceites(host):
     assert host_permitido(host) is True
 
 
 @pytest.mark.parametrize("host", [
+    "[::1]xyz",
+    "[::1]:5000lixo",
+    "127.0.0.1:",
+    "127.0.0.1:abc",
+    "127.0.0.1:123456",
+    "::1",
+    " localhost",
+    "localhost\t",
     "evil.example",
     "evil.example:5000",
     "localhost.evil.com",
