@@ -133,11 +133,14 @@ def test_token_na_url_nao_e_anulado_pelo_cabecalho(ctx):
     assert r.status_code == 403
 
 
-def test_token_da_url_nao_fica_em_logs(ctx):
+def test_token_da_url_nao_fica_no_log_da_api(ctx):
     stub, client = ctx
     client.get(f"/protegido?token={TOKEN}")
     registado = [c["token"] for c in stub.api_logger.chamadas]
-    assert TOKEN not in registado, "o token da URL nao deve ser copiado para os logs"
+    assert TOKEN not in registado, (
+        "o logger da API nao deve copiar o token da URL "
+        "(o stderr do servidor de desenvolvimento e outra historia - ver SECURITY.md)"
+    )
 
 
 def test_outros_parametros_na_url_nao_estorvam(ctx):

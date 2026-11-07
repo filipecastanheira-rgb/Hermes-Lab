@@ -45,8 +45,11 @@ folder — no longer grants access.
 - **Network exposure:** the API binds to `127.0.0.1` only, and that is enforced
   in code rather than configuration: `endereco_bind()` refuses anything that is
   not a literal loopback address, so one careless edit — or a tool rewriting
-  the file — fails at startup instead of exposing the service on a machine that
-  has internet access. It is not reachable from other devices on the local
+  the file — raises inside the API thread before the server binds, instead of exposing the
+  service on a machine that has internet access. The process stays up, the health
+  check reports `api_thread_viva: false`, and recovery is manual (or the watchdog,
+  if it acts). It fails loudly, but it does not stop the program - stated here
+  rather than implied. It is not reachable from other devices on the local
   network or from the internet, even if the host machine has other services
   exposed.
 - **Rate limiting:** requests are limited per token and per client address. On a
@@ -92,6 +95,15 @@ Residual exposure, stated plainly: a local process running as the same user
 could race the browser for the nonce during its 60 s window, and could read the
 browser profile anyway. The trust boundary here is the operating-system user,
 not the file.
+
+### Residual exposure: the development server's own log
+
+Flask's development server writes the request line to stderr, query string
+included. A request to `/dashboard/view?token=...` is refused with `403` and the
+API log records only `token_ref`, but the raw URL still lands in the process
+stderr, where it is neither rotated nor cleaned by Hermes. That is the residual
+exposure of the URL-token path: the API no longer stores it, the process output
+still does.
 
 ## Tokens in logs and persisted state
 
