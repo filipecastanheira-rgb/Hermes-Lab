@@ -100,3 +100,17 @@ def test_ficheiro_e_criado_com_permissoes_restritas(tmp_path):
     ficheiro = tmp_path / "purple_auth.json"
     PurpleAuth(str(ficheiro))
     assert (ficheiro.stat().st_mode & 0o777) == 0o600
+
+
+def test_token_publico_conhecido_nao_e_migrado(tmp_path):
+    """sha256("hermes-default") e publico: migra-lo mantinha o acesso aberto."""
+    from hermes.purple.purple_auth import TOKEN_PUBLICO_CONHECIDO
+
+    ficheiro = tmp_path / "purple_auth.json"
+    ficheiro.write_text(json.dumps({"token": TOKEN_PUBLICO_CONHECIDO}))
+
+    auth = PurpleAuth(str(ficheiro))
+
+    assert auth.validar(TOKEN_PUBLICO_CONHECIDO) is None
+    assert auth.token_inicial, "tem de emitir um token novo e mostra-lo uma vez"
+    assert auth.validar(auth.token_inicial) is not None

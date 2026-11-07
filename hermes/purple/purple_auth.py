@@ -19,6 +19,11 @@ import time
 
 FORMATO = 2
 
+# Valor que resultava de POST /token/regenerar sem corpo na versao anterior:
+# sha256("hermes-default"). E publico, portanto nunca pode sobreviver a uma
+# migracao - quem o tivesse conhecido mantinha o acesso para sempre.
+TOKEN_PUBLICO_CONHECIDO = hashlib.sha256(b"hermes-default").hexdigest()
+
 
 def hash_token(token):
     """Resumo do token. Nao reversivel: e isto que fica guardado em disco."""
@@ -59,6 +64,13 @@ class PurpleAuth:
             "migrado_de": self.dados.get("formato", 1),
             "migracao_em": time.ctime(),
         }
+        if antigo and hmac.compare_digest(str(antigo), TOKEN_PUBLICO_CONHECIDO):
+            # Token publico conhecido: migra-lo seria manter aberta a porta que
+            # a correcao veio fechar. Emite-se um novo e mostra-se uma vez.
+            self._guardar()
+            self.token_inicial = self.criar("cli")
+            return
+
         if antigo:
             self.dados["tokens"].append({
                 "id": secrets.token_hex(4),
