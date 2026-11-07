@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Hermes-Lab entry point: starts the PURPLE service and opens the dashboard."""
 import shutil
+import sys
 import subprocess
 import threading
 import time
@@ -37,7 +38,35 @@ def abrir_dashboard(url):
         print(f"[Hermes] Could not open the browser ({e}). Open the URL manually.")
 
 
+def comandos_tokens(argv):
+    """python3 hermes_cli.py tokens {criar,listar,revogar} ..."""
+    from hermes.purple import purple_tokens as T
+    from hermes.purple.purple_auth import PurpleAuth
+
+    if not argv:
+        print(T.utilizacao())
+        return 0
+
+    store = PurpleAuth()
+    acao = argv[0]
+
+    if acao == "criar":
+        token_id, token = T.criar(store, argv[1] if len(argv) > 1 else "token")
+        print(f"Token {token_id} criado. Guarda-o: nao volta a ser mostrado.")
+        print(token)
+    elif acao == "listar":
+        print(T.formatar_lista(T.listar(store)))
+    elif acao == "revogar" and len(argv) > 1:
+        print("Revogado." if T.revogar(store, argv[1]) else "Nao encontrado.")
+    else:
+        print(T.utilizacao())
+    return 0
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "tokens":
+        sys.exit(comandos_tokens(sys.argv[2:]))
+
     runner = PurpleRunner()
     thread = threading.Thread(target=runner.iniciar, daemon=True)
     thread.start()
