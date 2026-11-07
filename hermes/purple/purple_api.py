@@ -645,7 +645,12 @@ async function bootstrap() {
 function pedir(url, opcoes = {}) {
   const headers = Object.assign({}, opcoes.headers || {});
   if (SESSAO) {
-    headers["Content-Type"] = headers["Content-Type"] || "application/json";
+    // Content-Type only when there is a body. A GET with Content-Type
+    // application/json and no body makes the server try to parse the request as
+    // JSON, which fails and turns every dashboard request into a 400.
+    if (opcoes.body) {
+      headers["Content-Type"] = headers["Content-Type"] || "application/json";
+    }
   } else {
     headers["X-Hermes-Token"] = TOKEN;
   }
