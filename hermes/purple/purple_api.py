@@ -1,5 +1,6 @@
 import hmac
 import secrets
+import threading
 import time
 
 from flask import Flask, request, jsonify, Response
@@ -58,13 +59,16 @@ class Bootstrap:
     CLI faz de qualquer forma, porque e ele que abre o browser.
     """
 
-    TTL = 60
+    TTL = 60              # validade do nonce de arranque
+    SESSAO_TTL = 8 * 3600  # prazo absoluto de uma sessao
+    MAX_SESSOES = 10      # sessoes simultaneas; a mais antiga cai primeiro
 
     def __init__(self):
         self.nonce = None
         self.emitido_em = 0.0
         self.usado = True
         self.sessoes = {}
+        self.lock = threading.Lock()
 
     def novo_nonce(self):
         self.nonce = secrets.token_hex(32)
@@ -79,19 +83,42 @@ class Bootstrap:
         nonce que sobrevive a uma tentativa errada e um nonce que se pode
         continuar a tentar.
         """
-        if self.usado or not self.nonce:
-            return None
-        igual = hmac.compare_digest(str(nonce or ""), self.nonce)
-        expirado = (time.time() - self.emitido_em) > self.TTL
-        self.usado = True
-        if not igual or expirado or not _loopback(ip):
-            return None
-        sid = secrets.token_hex(32)
-        self.sessoes[sid] = {"criada_em": time.time()}
-        return sid
+        with self.lock:
+            if self.usado or not self.nonce:
+                return None
+            igual = hmac.compare_digest(str(nonce or ""), self.nonce)
+            expirado = (time.time() - self.emitido_em) > self.TTL
+            self.usado = True
+            if not igual or expirado or not _loopback(ip):
+                return None
+
+            agora = time.time()
+            sid = secrets.token_hex(32)
+            self.sessoes[sid] = {"criada_em": agora}
+            self._podar(agora)
+            return sid
+
+    def _podar(self, agora):
+        """Descarta sessoes expiradas e limita o total (chamado com o lock)."""
+        self.sessoes = {
+            k: v for k, v in self.sessoes.items()
+            if agora - v["criada_em"] <= self.SESSAO_TTL
+        }
+        while len(self.sessoes) > self.MAX_SESSOES:
+            mais_antiga = min(self.sessoes, key=lambda k: self.sessoes[k]["criada_em"])
+            self.sessoes.pop(mais_antiga, None)
 
     def sessao_valida(self, sid):
-        return bool(sid) and sid in self.sessoes
+        if not sid:
+            return False
+        with self.lock:
+            sessao = self.sessoes.get(sid)
+            if sessao is None:
+                return False
+            if time.time() - sessao["criada_em"] > self.SESSAO_TTL:
+                self.sessoes.pop(sid, None)
+                return False
+            return True
 
     def revogar(self, sid):
         return self.sessoes.pop(sid, None) is not None
