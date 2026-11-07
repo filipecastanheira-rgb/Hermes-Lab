@@ -61,8 +61,9 @@ def purple_dashboard():
     time.sleep(2)  # give the API a moment to come up
 
     porta = runner.config.obter("api_port") or 5000
-    token = runner.auth.auth["token"]
-    url = f"http://localhost:{porta}/dashboard/view?token={token}"
+    # The token no longer travels in the URL (and the auth object no longer
+    # exposes it): the dashboard signs in with a nonce.
+    url = f"http://localhost:{porta}/dashboard/view"
 
     print(f"[PURPLE] Opening dashboard: {url}")
     try:

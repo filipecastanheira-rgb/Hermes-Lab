@@ -12,10 +12,14 @@ def token_ref(token):
     menos cuidado do que a configuracao. Este resumo de 12 caracteres permite
     correlacionar pedidos do mesmo token (e detetar abuso repetido) sem
     permitir reconstruir o token a partir do log.
+
+    O prefixo "log:" evita que este valor seja um prefixo do resumo guardado em
+    purple_auth.json: os dois podem ser comparados, mas nenhum se deriva do outro
+    lendo um ficheiro de log.
     """
     if not token:
         return None
-    return hashlib.sha256(str(token).encode()).hexdigest()[:12]
+    return hashlib.sha256(("log:" + str(token)).encode()).hexdigest()[:12]
 
 
 class PurpleAPILogger:

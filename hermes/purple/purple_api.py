@@ -445,6 +445,15 @@ class PurpleAPI:
                 return jsonify({"erro": "Token desconhecido."}), 404
 
             self.api_logger.log_token_regenerado(novo_token)
+
+            # O evento do webhook diz que houve rotacao; o token nunca entra nele.
+            try:
+                if getattr(self, "webhooks", None) is not None:
+                    self.webhooks.enviar({"tipo": "token", "descricao": "Token regenerado via API PURPLE"})
+            except Exception:
+                if getattr(self, "logger", None) is not None:
+                    self.logger.warn("Falha ao enviar webhook da rotacao de token.")
+
             return jsonify({
                 "novo_token": novo_token,
                 "aviso": "Guarda este token agora: nao volta a ser mostrado.",
@@ -663,6 +672,7 @@ const $ = (id) => document.getElementById(id);
 
 let TOKEN = sessionStorage.getItem("hermes_token") || "";
 let SESSAO = false;
+let ULTIMO_ERRO = null;
 
 function cartao(titulo, valor) {
   const d = document.createElement("div");
@@ -732,7 +742,13 @@ async function entrar() {
     esconderLogin();
   } else {
     TOKEN = "";
-    $("token-msg").textContent = "Token inválido.";
+    if (!ULTIMO_ERRO || ULTIMO_ERRO.status === 403) {
+      $("token-msg").textContent = "Token inválido.";
+    } else if (ULTIMO_ERRO.rede) {
+      $("token-msg").textContent = "Sem ligação ao servidor.";
+    } else {
+      $("token-msg").textContent = "Erro HTTP " + ULTIMO_ERRO.status + ".";
+    }
   }
 }
 
@@ -750,6 +766,7 @@ async function atualizar() {
   try {
     const r = await pedir("/dashboard");
     if (!r.ok) {
+      ULTIMO_ERRO = {status: r.status};
       if (r.status === 403) {
         SESSAO = false;
         TOKEN = "";
@@ -807,6 +824,7 @@ async function atualizar() {
     $("ultima-atualizacao").textContent = "última atualização: " + new Date().toLocaleTimeString();
     return true;
   } catch (e) {
+    ULTIMO_ERRO = {rede: true};
     $("ultima-atualizacao").textContent = "erro a atualizar: " + e;
     return false;
   }

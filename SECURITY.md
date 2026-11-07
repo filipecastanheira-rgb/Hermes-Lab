@@ -109,7 +109,8 @@ still does.
 
 The API log (`logs/purple_api.log`) and the rate-limit state
 (`config/purple_ratelimit.json`) are plaintext files on disk. Neither holds a
-token: every entry carries `token_ref`, a truncated SHA-256 of the token. That
+token: every entry carries `token_ref`, a truncated SHA-256 of the token derived from a
+separate context string (so it is not a prefix of the stored hash). That
 is enough to correlate requests made with the same token (and to spot repeated
 abuse) but not enough to reconstruct it.
 

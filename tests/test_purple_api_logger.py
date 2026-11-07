@@ -76,3 +76,10 @@ def test_ficheiro_do_rate_limit_nao_guarda_o_token(tmp_path):
     chaves = list(json.loads(texto)["tokens"].keys())
     assert len(chaves) == 1, "o mesmo token tem de produzir a mesma chave"
     assert len(chaves[0]) == 16
+
+
+def test_token_ref_nao_e_prefixo_do_resumo_guardado():
+    """Um log nao deve permitir correlacionar com o ficheiro de tokens."""
+    from hermes.purple.purple_auth import hash_token
+
+    assert not hash_token(SEGREDO).startswith(token_ref(SEGREDO))
