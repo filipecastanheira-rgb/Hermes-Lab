@@ -805,7 +805,17 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
 });
 
 (async () => {
-  SESSAO = await bootstrap();
+  const temNonce = location.hash.startsWith("#n=");
+  if (temNonce) {
+    // The nonce exists only in this load: if the exchange fails there is no
+    // session to fall back on.
+    SESSAO = await bootstrap();
+  } else if (!TOKEN) {
+    // Reload or a second tab: the cookie may be valid. Assume it is and let the
+    // 403 from atualizar() reset the state, instead of showing a token box to
+    // someone who is already signed in.
+    SESSAO = true;
+  }
   if (!SESSAO && !TOKEN) {
     mostrarLogin("");
   } else {
