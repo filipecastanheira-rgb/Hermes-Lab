@@ -50,7 +50,7 @@ def parse_evento(dados_brutos: dict) -> dict | None:
         "porta_origem": None,
         "porta_destino": dados_brutos.get("porta"),
         "protocolo": dados_brutos.get("protocolo"),
-        "assinatura": f"Porta aberta: {dados_brutos.get('porta')}/{dados_brutos.get('protocolo')} ({dados_brutos.get('servico', '?')})",
+        "assinatura": f"Open port: {dados_brutos.get('porta')}/{dados_brutos.get('protocolo')} ({dados_brutos.get('servico', '?')})",
         "categoria": "Port Scan Result",
         "severidade": None,
         "timestamp_ferramenta": dados_brutos.get("timestamp"),
@@ -98,7 +98,7 @@ def _correr_scan(alvo: str) -> list:
         print("[NMAP_READER] 'nmap' is not installed.")
         return []
     except subprocess.TimeoutExpired:
-        print(f"[NMAP_READER] Scan a {alvo} excedeu o tempo limite.")
+        print(f"[NMAP_READER] Scan of {alvo} timed out.")
         return []
 
     if resultado.returncode != 0:
@@ -167,7 +167,7 @@ def vigiar(router, alvo: str, intervalo: int = 300):
     while True:
         eventos = ler_uma_vez(alvo)
         for evento in eventos:
-            print(f"[NMAP_READER] {evento['assinatura']} em {evento['ip']}")
+            print(f"[NMAP_READER] {evento['assinatura']} on {evento['ip']}")
 
             if router.correlator:
                 router.correlator.registar_evento(evento)

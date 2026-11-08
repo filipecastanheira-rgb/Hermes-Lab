@@ -259,7 +259,7 @@ class PurpleAPI:
                 return jsonify({"erro": "Rate limit exceeded for this IP"}), 429
 
             if token and not self.ratelimit.verificar_token(token):
-                self.api_logger.log_acesso_negado(endpoint, "Rate limit do token excedido")
+                self.api_logger.log_acesso_negado(endpoint, "Token rate limit exceeded")
                 return jsonify({"erro": "Rate limit exceeded for this token"}), 429
 
             sid = request.cookies.get("hermes_session")

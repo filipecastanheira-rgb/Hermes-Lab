@@ -27,8 +27,8 @@ class Scanner:
         finally:
             sock.close()
 
-        estado = "aberta" if result == 0 else "fechada"
-        print(f"[SCANNER] Porta {port} {estado} em {ip}")
+        estado = "open" if result == 0 else "closed"
+        print(f"[SCANNER] Port {port} {estado} on {ip}")
 
         evento = {
             "tipo": "scan_port",
@@ -57,7 +57,7 @@ class Scanner:
 
             if result == 0:
                 abertas.append(porta)
-                print(f"[SCANNER] Porta {porta} aberta em {ip}")
+                print(f"[SCANNER] Port {porta} open on {ip}")
 
         evento = {
             "tipo": "scan_range",

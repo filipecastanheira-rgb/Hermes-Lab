@@ -155,7 +155,7 @@ def vigiar(router, caminho=EVE_PATH_DEFAULT, intervalo=2):
             if not evento:
                 continue
 
-            print(f"[SURICATA_READER] Alerta: {evento['assinatura']} ({evento['ip']} -> {evento['ip_destino']})")
+            print(f"[SURICATA_READER] Alert: {evento['assinatura']} ({evento['ip']} -> {evento['ip_destino']})")
 
             if router.correlator:
                 router.correlator.registar_evento(evento)

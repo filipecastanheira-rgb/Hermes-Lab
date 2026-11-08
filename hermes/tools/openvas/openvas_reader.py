@@ -211,7 +211,7 @@ def parse_evento(dados_brutos):
         "porta_origem": None,
         "porta_destino": dados_brutos.get("porta"),
         "protocolo": None,
-        "assinatura": dados_brutos.get("nome") or "Resultado OpenVAS",
+        "assinatura": dados_brutos.get("nome") or "OpenVAS result",
         "categoria": "Vulnerability Scan Result",
         "severidade": severidade,
         "timestamp_ferramenta": dados_brutos.get("timestamp"),
@@ -249,7 +249,7 @@ def ler_uma_vez(alvo):
     ficheiro).
     """
     if not alvo_permitido(alvo):
-        print("[OPENVAS_READER] Alvo fora do laboratorio autorizado, recusado: " + alvo)
+        print("[OPENVAS_READER] Target outside the authorized lab, refused: " + alvo)
         return []
 
     target_id = _obter_ou_criar_target(alvo)
@@ -297,7 +297,7 @@ def vigiar(router, alvo, intervalo=3600):
     while True:
         eventos = ler_uma_vez(alvo)
         for evento in eventos:
-            print("[OPENVAS_READER] " + evento["assinatura"] + " em " + str(evento["ip"]) + " (severidade: " + str(evento["severidade"]) + ")")
+            print("[OPENVAS_READER] " + evento["assinatura"] + " on " + str(evento["ip"]) + " (severity: " + str(evento["severidade"]) + ")")
 
             if router.correlator:
                 router.correlator.registar_evento(evento)
