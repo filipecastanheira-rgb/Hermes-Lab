@@ -258,10 +258,6 @@ class PurpleAPI:
                 self.api_logger.log_acesso_negado(endpoint, f"Rate limit IP excedido ({ip})")
                 return jsonify({"erro": "Rate limit exceeded for this IP"}), 429
 
-            if token and not self.ratelimit.verificar_token(token):
-                self.api_logger.log_acesso_negado(endpoint, "Token rate limit exceeded")
-                return jsonify({"erro": "Rate limit exceeded for this token"}), 429
-
             sid = request.cookies.get("hermes_session")
             if sid and self.bootstrap.sessao_valida(sid):
                 identidade = {"id": "sessao-local", "nome": "local"}
@@ -270,6 +266,14 @@ class PurpleAPI:
             if identidade is None:
                 self.api_logger.log_erro_autenticacao(endpoint, token)
                 return jsonify({"erro": "Invalid or missing token"}), 403
+
+            # Only a valid token is rate-limited, so arbitrary strings sent by a
+            # client never accumulate in the rate-limit registry. Requests
+            # authenticated by session cookie carry no token and are covered by
+            # the per-IP limit above.
+            if identidade.get("id") != "sessao-local" and not self.ratelimit.verificar_token(token):
+                self.api_logger.log_acesso_negado(endpoint, "Token rate limit exceeded")
+                return jsonify({"erro": "Rate limit exceeded for this token"}), 429
 
             # Uma cookie viaja sozinha em qualquer pedido que o browser faca a
             # este host, por isso um pedido que altera estado tem de provar que

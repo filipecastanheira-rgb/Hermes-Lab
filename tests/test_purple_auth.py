@@ -177,3 +177,37 @@ def test_dashboard_view_e_servida_sem_autenticacao_e_sem_token():
 
     # e a mesma rota com ?token= continua a ser recusada
     assert client.get("/dashboard/view?token=abc").status_code == 403
+
+
+class CountingRateLimit:
+    def __init__(self, permitir=True):
+        self.tokens = []
+        self.permitir = permitir
+
+    def verificar_ip(self, ip):
+        return True
+
+    def verificar_token(self, token):
+        self.tokens.append(token)
+        return self.permitir
+
+
+def test_token_invalido_nao_chega_ao_rate_limit(ctx):
+    stub, client = ctx
+    stub.ratelimit = CountingRateLimit()
+    assert client.get("/protegido", headers={"X-Hermes-Token": "errado"}).status_code == 403
+    assert stub.ratelimit.tokens == []
+
+
+def test_token_valido_passa_pelo_rate_limit(ctx):
+    stub, client = ctx
+    stub.ratelimit = CountingRateLimit()
+    assert client.get("/protegido", headers={"X-Hermes-Token": TOKEN}).status_code == 200
+    assert stub.ratelimit.tokens == [TOKEN]
+
+
+def test_token_valido_acima_do_limite_recebe_429(ctx):
+    stub, client = ctx
+    stub.ratelimit = CountingRateLimit(permitir=False)
+    assert client.get("/protegido", headers={"X-Hermes-Token": TOKEN}).status_code == 429
+    assert stub.api_logger.chamadas == []
