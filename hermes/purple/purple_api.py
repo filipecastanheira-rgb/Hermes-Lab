@@ -86,7 +86,9 @@ class Bootstrap:
         with self.lock:
             if self.usado or not self.nonce:
                 return None
-            igual = hmac.compare_digest(str(nonce or ""), self.nonce)
+            # Em bytes: compare_digest com str so aceita ASCII e lancaria
+            # TypeError antes de o nonce ser consumido.
+            igual = hmac.compare_digest(str(nonce or "").encode(), self.nonce.encode())
             expirado = (time.time() - self.emitido_em) > self.TTL
             self.usado = True
             if not igual or expirado or not _loopback(ip):

@@ -100,6 +100,14 @@ def test_nonce_so_em_loopback():
     assert b.trocar(nonce, "10.0.0.5") is None
 
 
+def test_nonce_nao_ascii_e_consumido_sem_erro():
+    b = Bootstrap()
+    nonce = b.novo_nonce()
+    assert b.trocar("n\u00e3o-ascii-\u0663", "127.0.0.1") is None
+    # a tentativa queimou o nonce, tal como qualquer outra tentativa errada
+    assert b.trocar(nonce, "127.0.0.1") is None
+
+
 # ------------------------------------------------------------------ rotas
 
 
@@ -166,3 +174,10 @@ def test_cabecalho_continua_a_funcionar_sem_cookie():
     _, client = _client()
     r = client.get("/dashboard", headers={"X-Hermes-Token": "bom"})
     assert r.status_code == 200
+
+
+
+def test_bootstrap_com_nonce_nao_ascii_recusa_com_403():
+    api, client = _client()
+    api.bootstrap.novo_nonce()
+    assert _bootstrap(client, "n\u00e3o-ascii-\u0663").status_code == 403
