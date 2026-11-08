@@ -45,6 +45,7 @@ class FakeRateLimit:
     "LOCALHOST:8080",
     "127.0.0.1",
     "127.0.0.1:5000",
+    "127.0.0.1:65535",
     "[::1]:5000",
 ])
 def test_hosts_locais_sao_aceites(host):
@@ -57,6 +58,10 @@ def test_hosts_locais_sao_aceites(host):
     "127.0.0.1:",
     "127.0.0.1:abc",
     "127.0.0.1:123456",
+    "127.0.0.1:\u0665",
+    "127.0.0.1:\u00b2",
+    "localhost:99999",
+    "127.0.0.1:65536",
     "::1",
     " localhost",
     "localhost\t",

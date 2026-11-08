@@ -153,7 +153,11 @@ def host_permitido(host_header):
     else:
         nome = h
 
-    if porta is not None and (not porta.isdigit() or len(porta) > 5):
+    # ASCII digits only: str.isdigit() also accepts Unicode digits such as
+    # "\u0665" and "\u00b2". The port must also fit in 16 bits.
+    if porta is not None and not (
+        porta.isascii() and porta.isdigit() and int(porta) <= 65535
+    ):
         return False
 
     return nome in HOSTS_LOCAIS
