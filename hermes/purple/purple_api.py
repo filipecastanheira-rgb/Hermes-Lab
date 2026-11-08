@@ -1,8 +1,160 @@
+import hmac
+import secrets
+import threading
+import time
+
 from flask import Flask, request, jsonify, Response
 
 from hermes.tools.agregador_ferramentas import ler_uma_vez_todas
 from hermes.core.lab_boundary import alvo_permitido
 from functools import wraps
+
+# Nomes pelos quais a app se pode apresentar. So estes: a API nao foi feita
+# para ser acedida por nome nenhum, e o browser de um atacante pode resolver
+# um dominio dele para 127.0.0.1 (DNS rebinding) - nesse caso o pedido chega
+# a este servidor mas traz esse dominio no cabecalho Host.
+HOSTS_LOCAIS = {"127.0.0.1", "localhost", "::1"}
+
+# Endereco de bind da API. E uma invariante, nao um parametro: a app nunca
+# deve ficar exposta na rede, mesmo que a maquina tenha ligacao a internet.
+# Fica aqui como constante e passa por `endereco_bind()` no arranque, para que
+# uma alteracao descuidada falhe de imediato em vez de expor o servico.
+HOST_BIND = "127.0.0.1"
+BINDS_PERMITIDOS = {"127.0.0.1", "::1"}
+
+
+def endereco_bind(host=None):
+    """Devolve o endereco de bind, recusando qualquer coisa que nao seja loopback.
+
+    Aceita apenas enderecos literais de loopback - nao aceita `localhost`,
+    porque o nome depende do resolver e do /etc/hosts, enquanto 127.0.0.1 nao
+    depende de nada. Falha com ValueError em vez de arrancar exposto: um erro
+    no arranque e um incidente visivel, um bind em 0.0.0.0 e um incidente
+    silencioso.
+    """
+    alvo = HOST_BIND if host is None else host
+    if alvo not in BINDS_PERMITIDOS:
+        raise ValueError(
+            f"Bind recusado: {alvo!r}. A API PURPLE so pode escutar em loopback "
+            f"({', '.join(sorted(BINDS_PERMITIDOS))}). Para expor o servico na rede "
+            "seria preciso alterar esta invariante de proposito."
+        )
+    return alvo
+
+
+def _loopback(ip):
+    return (ip or "") in {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
+
+
+class Bootstrap:
+    """Entrada sem token para o dono, a partir da propria maquina.
+
+    O CLI gera um nonce de uso unico, valido TTL segundos, e abre o browser com
+    esse nonce no fragmento do URL (#n=...). O fragmento nao e enviado ao
+    servidor, nao vai no Referer e nao aparece nos logs de acesso. O JavaScript
+    troca-o por uma cookie HttpOnly e apaga-o do URL.
+
+    Nada disto passa por disco: o nonce e as sessoes vivem em memoria e morrem
+    com o processo. Reiniciar o servidor obriga a um novo arranque - o que o
+    CLI faz de qualquer forma, porque e ele que abre o browser.
+    """
+
+    TTL = 60              # validade do nonce de arranque
+    SESSAO_TTL = 8 * 3600  # prazo absoluto de uma sessao
+    MAX_SESSOES = 10      # sessoes simultaneas; a mais antiga cai primeiro
+
+    def __init__(self):
+        self.nonce = None
+        self.emitido_em = 0.0
+        self.usado = True
+        self.sessoes = {}
+        self.lock = threading.Lock()
+
+    def novo_nonce(self):
+        self.nonce = secrets.token_hex(32)
+        self.emitido_em = time.time()
+        self.usado = False
+        return self.nonce
+
+    def trocar(self, nonce, ip):
+        """Devolve um id de sessao novo, ou None.
+
+        O nonce e consumido no primeiro uso, mesmo que a validacao falhe: um
+        nonce que sobrevive a uma tentativa errada e um nonce que se pode
+        continuar a tentar.
+        """
+        with self.lock:
+            if self.usado or not self.nonce:
+                return None
+            igual = hmac.compare_digest(str(nonce or ""), self.nonce)
+            expirado = (time.time() - self.emitido_em) > self.TTL
+            self.usado = True
+            if not igual or expirado or not _loopback(ip):
+                return None
+
+            agora = time.time()
+            sid = secrets.token_hex(32)
+            self.sessoes[sid] = {"criada_em": agora}
+            self._podar(agora)
+            return sid
+
+    def _podar(self, agora):
+        """Descarta sessoes expiradas e limita o total (chamado com o lock)."""
+        self.sessoes = {
+            k: v for k, v in self.sessoes.items()
+            if agora - v["criada_em"] <= self.SESSAO_TTL
+        }
+        while len(self.sessoes) > self.MAX_SESSOES:
+            mais_antiga = min(self.sessoes, key=lambda k: self.sessoes[k]["criada_em"])
+            self.sessoes.pop(mais_antiga, None)
+
+    def sessao_valida(self, sid):
+        if not sid:
+            return False
+        with self.lock:
+            sessao = self.sessoes.get(sid)
+            if sessao is None:
+                return False
+            if time.time() - sessao["criada_em"] > self.SESSAO_TTL:
+                self.sessoes.pop(sid, None)
+                return False
+            return True
+
+    def revogar(self, sid):
+        return self.sessoes.pop(sid, None) is not None
+
+
+def host_permitido(host_header):
+    """True only for a local name, with or without a port.
+
+    The whole name is compared (never a prefix, so `localhost.evil.com` fails)
+    and a port, when present, must be digits only. An IPv6 literal has to be
+    bracketed, as RFC 3986 requires: `[::1]` or `[::1]:5000`. Any whitespace in
+    the value rejects the request instead of being tolerated.
+    """
+    if not host_header or any(c.isspace() for c in host_header):
+        return False
+
+    h = host_header.lower()
+    porta = None
+
+    if h.startswith("["):
+        if "]" not in h:
+            return False
+        nome, resto = h[1:].split("]", 1)
+        if resto:
+            if not resto.startswith(":"):
+                return False
+            porta = resto[1:]
+    elif ":" in h:
+        nome, porta = h.rsplit(":", 1)
+    else:
+        nome = h
+
+    if porta is not None and (not porta.isdigit() or len(porta) > 5):
+        return False
+
+    return nome in HOSTS_LOCAIS
 
 
 class PurpleAPI:
@@ -31,40 +183,121 @@ class PurpleAPI:
         self.webhooks = webhooks
         self.dashboard = dashboard
 
+        self.bootstrap = Bootstrap()
         self.app = Flask("HermesPurpleAPI")
+
+        @self.app.before_request
+        def _validar_host():
+            """Recusa pedidos cujo Host nao seja um nome local (DNS rebinding).
+
+            Um dominio controlado pelo atacante que resolva para 127.0.0.1 faz
+            o browser enviar esse dominio no Host: o pedido chega ao servidor
+            a partir da maquina da vitima, com o token dela. Rejeitar Hosts
+            desconhecidos fecha essa via sem depender de como o browser trata
+            o Same-Origin Policy.
+            """
+            if not host_permitido(request.headers.get("Host", "")):
+                return Response("Host nao permitido", status=400, mimetype="text/plain")
+            return None
+
         self._definir_rotas()
+
+    def _recusar_token_na_url(self, endpoint):
+        """Devolve uma resposta 403 se o pedido trouxer o token na query string.
+
+        Um token na URL fica no historico do browser, no cabecalho Referer
+        enviado a terceiros e nos logs de acesso do servidor - ou seja,
+        sobrevive ao pedido. Por isso nao e aceite em rota nenhuma: nem nas
+        autenticadas, nem na casca do dashboard (onde seria inerte, mas
+        continuaria a ser registado em logs). Devolve None quando o pedido
+        nao traz token na URL.
+        """
+        if request.args.get("token") is None:
+            return None
+
+        self.api_logger.log_acesso_negado(
+            endpoint,
+            "Token recusado na query string (usar o cabecalho X-Hermes-Token)",
+        )
+        if getattr(self, "alerts", None) is not None:
+            self.alerts.emitir_alerta(
+                severidade="MEDIO",
+                origem="purple_api",
+                descricao=f"Pedido com token na URL recusado em {endpoint}",
+                contexto={"endpoint": endpoint, "ip": request.remote_addr},
+            )
+        return jsonify({
+            "erro": "Token na URL nao e aceite. Usa o cabecalho X-Hermes-Token."
+        }), 403
 
     def _require_token(self, func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            token = request.headers.get("X-Hermes-Token")
-            # A browser navigation cannot set headers, so the initial dashboard
-            # page load is the only route that may take the token from the URL.
-            if not token and request.path == "/dashboard/view":
-                token = request.args.get("token")
             ip = request.remote_addr
             endpoint = request.path
 
-            self.api_logger.log_chamada(
-                endpoint=endpoint,
-                metodo=request.method,
-                token=token,
-                payload=request.json if request.is_json else {},
-            )
+            recusa = self._recusar_token_na_url(endpoint)
+            if recusa is not None:
+                return recusa
 
+            token = request.headers.get("X-Hermes-Token")
+
+            # Nota: localmente o cliente e sempre 127.0.0.1, portanto este
+            # limite "por IP" funciona na pratica como um limite GLOBAL. E o
+            # comportamento pretendido: um servico que so tem um cliente local
+            # quer proteger-se de um cliente descontrolado (um bug que dispara
+            # pedidos em ciclo), nao de um ataque distribuido. O limite por
+            # token e que distingue clientes entre si.
             if not self.ratelimit.verificar_ip(ip):
                 self.api_logger.log_acesso_negado(endpoint, f"Rate limit IP excedido ({ip})")
                 return jsonify({"erro": "Rate limit excedido para este IP"}), 429
 
-            if not token or not self.auth.validar(token):
+            if token and not self.ratelimit.verificar_token(token):
+                self.api_logger.log_acesso_negado(endpoint, "Rate limit do token excedido")
+                return jsonify({"erro": "Rate limit excedido para este token"}), 429
+
+            sid = request.cookies.get("hermes_session")
+            if sid and self.bootstrap.sessao_valida(sid):
+                identidade = {"id": "sessao-local", "nome": "local"}
+            else:
+                identidade = self.auth.validar(token) if token else None
+            if identidade is None:
                 self.api_logger.log_erro_autenticacao(endpoint, token)
                 return jsonify({"erro": "Token inválido ou ausente"}), 403
 
-            # Only a valid token is rate-limited, so arbitrary strings sent by a
-            # client never accumulate in the rate-limit registry.
-            if not self.ratelimit.verificar_token(token):
-                self.api_logger.log_acesso_negado(endpoint, "Rate limit token excedido")
-                return jsonify({"erro": "Rate limit excedido para este token"}), 429
+            # Uma cookie viaja sozinha em qualquer pedido que o browser faca a
+            # este host, por isso um pedido que altera estado tem de provar que
+            # veio da propria pagina: o Origin tem de ser o deste servidor.
+            if identidade.get("id") == "sessao-local" and request.method not in ("GET", "HEAD", "OPTIONS"):
+                esperado = f"http://{request.host}"
+                if request.headers.get("Origin") != esperado:
+                    self.api_logger.log_acesso_negado(
+                        endpoint, "Origem inesperada num pedido autenticado por cookie")
+                    if getattr(self, "alerts", None) is not None:
+                        self.alerts.emitir_alerta(
+                            severidade="MEDIO",
+                            origem="purple_api",
+                            descricao=f"Pedido com cookie e Origin diferente recusado em {endpoint}",
+                            contexto={"endpoint": endpoint, "origem": request.headers.get("Origin")},
+                        )
+                    return jsonify({"erro": "Origem não permitida."}), 403
+
+            # Quem fez o pedido, para o log e para as rotas que precisam de o saber
+            request.environ["hermes.token"] = identidade
+
+            # So os pedidos autenticados ficam registados como "chamada": um
+            # pedido rejeitado ja fica em erro_autenticacao/acesso_negado, e o
+            # corpo de um pedido nao autenticado (controlado por quem o envia)
+            # nao deve ser copiado para o log.
+            # get_json(silent=True): an empty or malformed body must be logged as
+            # {}, never raise and turn the request into a 400.
+            self.api_logger.log_chamada(
+                endpoint=endpoint,
+                metodo=request.method,
+                token=token,
+                payload=request.get_json(silent=True) or {},
+                utilizador=identidade.get("nome"),
+            )
 
             return func(*args, **kwargs)
         return wrapper
@@ -92,6 +325,32 @@ class PurpleAPI:
         return jsonify(dados)
 
     def _definir_rotas(self):
+
+        @self.app.route("/auth/bootstrap", methods=["POST"])
+        def auth_bootstrap():
+            """Troca o nonce de arranque por uma cookie de sessao HttpOnly."""
+            dados = request.json or {}
+            sid = self.bootstrap.trocar(dados.get("nonce"), request.remote_addr)
+            if sid is None:
+                self.api_logger.log_acesso_negado(
+                    "/auth/bootstrap",
+                    "Nonce de arranque invalido, expirado ou ja usado",
+                )
+                return jsonify({"erro": "Nonce invalido."}), 403
+
+            resposta = jsonify({"ok": True})
+            resposta.set_cookie("hermes_session", sid, httponly=True, samesite="Strict", path="/")
+            self.api_logger.log_chamada(
+                "/auth/bootstrap", "POST", None, {}, utilizador="local",
+            )
+            return resposta
+
+        @self.app.route("/auth/logout", methods=["POST"])
+        def auth_logout():
+            self.bootstrap.revogar(request.cookies.get("hermes_session"))
+            resposta = jsonify({"ok": True})
+            resposta.delete_cookie("hermes_session", path="/")
+            return resposta
 
         @self.app.route("/status", methods=["GET"])
         @self._require_token
@@ -170,17 +429,35 @@ class PurpleAPI:
         @self.app.route("/token/regenerar", methods=["POST"])
         @self._require_token
         def regenerar_token():
-            # The new token is always random (secrets.token_hex). Any "base"
-            # sent by the client is ignored, so it can never be predictable.
-            novo_token = self.auth.atualizar_token()
-            self.api_logger.log_token_regenerado()
+            """Revoga o token apresentado e emite um novo com o mesmo nome.
 
-            resposta = {"novo_token": novo_token}
+            O token e gerado pelo servidor com secrets.token_hex(32). A versao
+            anterior aceitava uma "base" do chamador (por omissao
+            "hermes-default") e calculava sha256(base): o token resultante era
+            previsivel e publico, porque a base por omissao esta no codigo.
 
-            return self._responder(
-                "/token/regenerar", resposta,
-                webhook_evento={"tipo": "token", "descricao": "Token regenerado via API PURPLE"},
-            )
+            A resposta nao passa por _responder(): esse caminho escreve a
+            resposta no log, e o token novo iria para o ficheiro de log.
+            """
+            identidade = request.environ.get("hermes.token") or {}
+            novo_token = self.auth.regenerar(identidade.get("id"))
+            if novo_token is None:
+                return jsonify({"erro": "Token desconhecido."}), 404
+
+            self.api_logger.log_token_regenerado(novo_token)
+
+            # O evento do webhook diz que houve rotacao; o token nunca entra nele.
+            try:
+                if getattr(self, "webhooks", None) is not None:
+                    self.webhooks.enviar({"tipo": "token", "descricao": "Token regenerado via API PURPLE"})
+            except Exception:
+                if getattr(self, "logger", None) is not None:
+                    self.logger.warn("Falha ao enviar webhook da rotacao de token.")
+
+            return jsonify({
+                "novo_token": novo_token,
+                "aviso": "Guarda este token agora: nao volta a ser mostrado.",
+            }), 200
 
         @self.app.route("/dashboard", methods=["GET"])
         @self._require_token
@@ -192,13 +469,23 @@ class PurpleAPI:
             return self._responder("/dashboard", dados)
 
         @self.app.route("/dashboard/view", methods=["GET"])
-        @self._require_token
         def dashboard_view():
+            """
+            Serve apenas a "casca" da pagina do dashboard: HTML e JavaScript,
+            sem dados e sem token lá dentro. Os dados continuam a vir de
+            /dashboard, que exige o cabecalho com o token. Como a casca nao
+            expoe nada, pode ser servida sem autenticacao - e e o que permite
+            abrir o dashboard no browser (uma navegacao nao consegue enviar
+            cabecalhos) sem voltar a por o token na URL.
+            """
             if self.dashboard is None:
                 return "<h1>Dashboard não está configurado.</h1>", 501
 
-            token = request.args.get("token", "")
-            return Response(_DASHBOARD_HTML.replace("__TOKEN__", token), mimetype="text/html")
+            recusa = self._recusar_token_na_url(request.path)
+            if recusa is not None:
+                return recusa
+
+            return Response(_DASHBOARD_HTML, mimetype="text/html")
 
         @self.app.route("/run_tool", methods=["POST"])
         @self._require_token
@@ -307,7 +594,7 @@ class PurpleAPI:
         # pedidos, incluindo o polling do dashboard a cada 5s. Confirmado
         # como causa provavel de erros de rede no browser durante execucoes
         # longas.
-        self.app.run(host="127.0.0.1", port=porta, use_reloader=False, threaded=True)
+        self.app.run(host=endereco_bind(), port=porta, use_reloader=False, threaded=True)
 
 
 _DASHBOARD_HTML = """
@@ -334,6 +621,16 @@ _DASHBOARD_HTML = """
 <body>
 <h1>Hermes — PURPLE Dashboard</h1>
 <div class="sub">Refreshes automatically every 5s · <span id="ultima-atualizacao" class="status">loading...</span></div>
+
+<div class="card" id="login" style="margin-bottom:24px; display:none;">
+  <h2>Token de acesso</h2>
+  <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+    <input id="token-input" type="password" autocomplete="off" placeholder="cola aqui o token que o Hermes mostrou no terminal"
+           style="background:#0f1117; color:#e6e6e6; border:1px solid #30363d; padding:8px; border-radius:6px; flex:1; min-width:240px;">
+    <button id="token-entrar" style="background:#238636; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer;">Entrar</button>
+  </div>
+  <div id="token-msg" style="font-size:0.8rem; color:#f85149; margin-top:6px;"></div>
+</div>
 
 <div class="grid" id="cartoes"></div>
 
@@ -367,61 +664,175 @@ _DASHBOARD_HTML = """
 </table>
 
 <script>
-const TOKEN = "__TOKEN__";
+// Nenhum HTML e construido a partir de dados: descricoes de alertas, nomes de
+// assinaturas e nomes de interface vem de fora (Suricata, correlator, ficheiros
+// de log) e entram sempre por textContent. Com uma sessao por cookie, um
+// innerHTML aqui seria XSS armazenado com acesso directo a API.
+const $ = (id) => document.getElementById(id);
+
+let TOKEN = sessionStorage.getItem("hermes_token") || "";
+let SESSAO = false;
+let ULTIMO_ERRO = null;
+
+function cartao(titulo, valor) {
+  const d = document.createElement("div");
+  d.className = "card";
+  const h = document.createElement("h2");
+  h.textContent = titulo;
+  const v = document.createElement("div");
+  v.className = "valor";
+  v.textContent = valor;
+  d.append(h, v);
+  return d;
+}
+
+function mostrarLogin(msg) {
+  $("login").style.display = "block";
+  $("token-msg").textContent = msg || "";
+}
+
+function esconderLogin() {
+  $("login").style.display = "none";
+  $("token-msg").textContent = "";
+}
+
+// O CLI abre a pagina com #n=<nonce>. O fragmento nunca chega ao servidor; e
+// trocado por uma cookie HttpOnly e apagado do URL antes de qualquer pedido.
+async function bootstrap() {
+  const m = location.hash.match(/^#n=([0-9a-f]{64})$/);
+  if (!m) return false;
+  history.replaceState(null, "", location.pathname + location.search);
+  try {
+    const r = await fetch("/auth/bootstrap", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({nonce: m[1]}),
+    });
+    return r.ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+function pedir(url, opcoes = {}) {
+  const headers = Object.assign({}, opcoes.headers || {});
+  if (SESSAO) {
+    // Content-Type only when there is a body. A GET with Content-Type
+    // application/json and no body makes the server try to parse the request as
+    // JSON, which fails and turns every dashboard request into a 400.
+    if (opcoes.body) {
+      headers["Content-Type"] = headers["Content-Type"] || "application/json";
+    }
+  } else {
+    headers["X-Hermes-Token"] = TOKEN;
+  }
+  return fetch(url, Object.assign({}, opcoes, {headers}));
+}
+
+async function entrar() {
+  const campo = $("token-input");
+  const valor = campo.value.trim();
+  if (!valor) return;
+  TOKEN = valor;
+  SESSAO = false;
+  const ok = await atualizar();
+  if (ok) {
+    sessionStorage.setItem("hermes_token", valor);
+    campo.value = "";
+    esconderLogin();
+  } else {
+    TOKEN = "";
+    if (!ULTIMO_ERRO || ULTIMO_ERRO.status === 403) {
+      $("token-msg").textContent = "Token inválido.";
+    } else if (ULTIMO_ERRO.rede) {
+      $("token-msg").textContent = "Sem ligação ao servidor.";
+    } else {
+      $("token-msg").textContent = "Erro HTTP " + ULTIMO_ERRO.status + ".";
+    }
+  }
+}
+
+$("token-entrar").addEventListener("click", entrar);
+$("token-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") entrar();
+});
 
 async function atualizar() {
+  if (!SESSAO && !TOKEN) {
+    $("ultima-atualizacao").textContent = "sem sessão";
+    mostrarLogin("");
+    return false;
+  }
   try {
-    const r = await fetch("/dashboard", {
-      headers: {"X-Hermes-Token": TOKEN},
-    });
+    const r = await pedir("/dashboard");
+    if (!r.ok) {
+      ULTIMO_ERRO = {status: r.status};
+      if (r.status === 403) {
+        SESSAO = false;
+        TOKEN = "";
+        sessionStorage.removeItem("hermes_token");
+        mostrarLogin("Sessão expirada. Cola o token ou reinicia o Hermes.");
+      }
+      $("ultima-atualizacao").textContent = "erro a atualizar: HTTP " + r.status;
+      return false;
+    }
     const d = await r.json();
-
     const metricas = d.metricas || {};
     const contadores = metricas.contadores || {};
     const alertas = d.alertas_recentes || [];
 
-    document.getElementById("cartoes").innerHTML = `
-      <div class="card"><h2>Status</h2><div class="valor" style="font-size:1.1rem;">${d.estado || "?"}</div></div>
-      <div class="card"><h2>Heartbeats PURPLE</h2><div class="valor">${contadores.heartbeat_purple || 0}</div></div>
-      <div class="card"><h2>Health-check failures (this run)</h2><div class="valor">${contadores.healthcheck_falha || 0}</div></div>
-      <div class="card"><h2>Operation</h2><div class="valor" style="font-size:1.1rem;">manual</div></div>
-    `;
+    $("cartoes").replaceChildren(
+      cartao("Status", d.estado || "?"),
+      cartao("Heartbeats PURPLE", contadores.heartbeat_purple || 0),
+      cartao("Falhas de health-check", contadores.healthcheck_falha || 0),
+      cartao("Operation", "manual")
+    );
 
-    const contagemOrigens = {};
-    alertas.forEach(a => {
-      const origem = a.origem || a.evento?.origem || "unknown";
-      contagemOrigens[origem] = (contagemOrigens[origem] || 0) + 1;
+    const contagem = new Map();
+    alertas.forEach((a) => {
+      const origem = a.origem || (a.evento && a.evento.origem) || "unknown";
+      contagem.set(origem, (contagem.get(origem) || 0) + 1);
     });
-    const origensHtml = Object.keys(contagemOrigens).length
-      ? Object.entries(contagemOrigens).map(([origem, n]) => `
-          <div class="card"><h2>${origem}</h2><div class="valor">${n}</div></div>
-        `).join("")
-      : `<div class="card"><h2>No data yet</h2><div class="valor" style="font-size:1rem;">-</div></div>`;
-    document.getElementById("origens").innerHTML = origensHtml;
+    const origens = [...contagem.entries()].map(([o, n]) => cartao(o, n));
+    $("origens").replaceChildren(...(origens.length ? origens : [cartao("No data yet", "-")]));
 
-    const corpo = alertas.length
-      ? alertas.slice(-20).reverse().map(a => `
-          <tr>
-            <td>${new Date((a.timestamp||0)*1000).toLocaleTimeString()}</td>
-            <td>${(a.origem || a.evento?.origem || "-")}</td>
-            <td>${(a.descricao || a.evento?.assinatura || JSON.stringify(a).slice(0,80))}</td>
-          </tr>`).join("")
-      : `<tr><td colspan="3" class="vazio">No alerts yet.</td></tr>`;
+    const tbody = $("tabela-alertas").querySelector("tbody");
+    if (!alertas.length) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 3;
+      td.className = "vazio";
+      td.textContent = "Sem alertas ainda.";
+      tr.append(td);
+      tbody.replaceChildren(tr);
+    } else {
+      tbody.replaceChildren(
+        ...alertas.slice(-20).reverse().map((a) => {
+          const tr = document.createElement("tr");
+          const quando = document.createElement("td");
+          quando.textContent = new Date((a.timestamp || 0) * 1000).toLocaleTimeString();
+          const origem = document.createElement("td");
+          origem.textContent = a.origem || (a.evento && a.evento.origem) || "-";
+          const desc = document.createElement("td");
+          desc.textContent = a.descricao || (a.evento && a.evento.assinatura) || JSON.stringify(a).slice(0, 80);
+          tr.append(quando, origem, desc);
+          return tr;
+        })
+      );
+    }
 
-    document.getElementById("tabela-alertas").querySelector("tbody").innerHTML = corpo;
-    document.getElementById("ultima-atualizacao").textContent = "last update: " + new Date().toLocaleTimeString();
+    $("ultima-atualizacao").textContent = "última atualização: " + new Date().toLocaleTimeString();
+    return true;
   } catch (e) {
-    document.getElementById("ultima-atualizacao").textContent = "update error: " + e;
+    ULTIMO_ERRO = {rede: true};
+    $("ultima-atualizacao").textContent = "erro a atualizar: " + e;
+    return false;
   }
 }
 
 document.getElementById("ferramenta").addEventListener("change", () => {
   const tool = document.getElementById("ferramenta").value;
   const alvoEl = document.getElementById("alvo");
-  // Cada tool espera um tipo de "alvo" diferente: nmap/openvas querem um
-  // IP; tshark quer uma interface de rede; suricata/zeek querem o
-  // caminho do ficheiro de log que leem (os mesmos caminhos usados na
-  // vigilancia continua de fundo, ver purple_runner.py).
   const valoresDefeito = {
     nmap: "127.0.0.1",
     openvas: "127.0.0.1",
@@ -433,6 +844,10 @@ document.getElementById("ferramenta").addEventListener("change", () => {
 });
 
 document.getElementById("btn-correr").addEventListener("click", async () => {
+  if (!SESSAO && !TOKEN) {
+    mostrarLogin("");
+    return;
+  }
   const tool = document.getElementById("ferramenta").value;
   const target = document.getElementById("alvo").value;
   const resultadoEl = document.getElementById("resultado-correr");
@@ -440,12 +855,12 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
 
   resultadoEl.textContent = "Running... (can take up to 2 min, especially for openvas)";
   resultadoEl.style.color = "#8b949e";
-  relatorioEl.innerHTML = `<div class="vazio">generating report...</div>`;
+  relatorioEl.textContent = "a gerar relatório...";
 
   try {
-    const r = await fetch("/run_tool", {
+    const r = await pedir("/run_tool", {
       method: "POST",
-      headers: {"Content-Type": "application/json", "X-Hermes-Token": TOKEN},
+      headers: {"Content-Type": "application/json"},
       body: JSON.stringify({tool, target}),
     });
     const d = await r.json();
@@ -453,9 +868,9 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
     if (!r.ok) {
       resultadoEl.textContent = d.error || "Blocked.";
       resultadoEl.style.color = "#f85149";
-      relatorioEl.innerHTML = `<div class="vazio">${d.error || "Blocked."}</div>`;
+      relatorioEl.textContent = d.error || "Bloqueado.";
     } else {
-      resultadoEl.textContent = `${d.events_found} event(s) found.`;
+      resultadoEl.textContent = d.events_found + " event(s) found.";
       resultadoEl.style.color = "#7ee787";
       relatorioEl.textContent = d.relatorio || "(no report)";
       atualizar();
@@ -463,12 +878,31 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
   } catch (e) {
     resultadoEl.textContent = "Error: " + e;
     resultadoEl.style.color = "#f85149";
-    relatorioEl.innerHTML = `<div class="vazio">Error: ${e}</div>`;
+    relatorioEl.textContent = "Erro: " + e;
   }
 });
 
-atualizar();
-setInterval(atualizar, 5000);
+(async () => {
+  const temNonce = location.hash.startsWith("#n=");
+  if (temNonce) {
+    // The nonce exists only in this load: if the exchange fails there is no
+    // session to fall back on.
+    SESSAO = await bootstrap();
+  } else if (!TOKEN) {
+    // Reload or a second tab: the cookie may be valid. Assume it is and let the
+    // 403 from atualizar() reset the state, instead of showing a token box to
+    // someone who is already signed in.
+    SESSAO = true;
+  }
+  if (!SESSAO && !TOKEN) {
+    mostrarLogin("");
+  } else {
+    esconderLogin();
+  }
+  atualizar();
+  setInterval(atualizar, 5000);
+})();
+
 </script>
 </body>
 </html>

@@ -5,25 +5,142 @@ and what is (and isn't) covered by automated tests.
 
 ## Authentication
 
-The PURPLE API is protected by a random token stored in
-`config/purple_auth.json` and sent in the `X-Hermes-Token` request header. The
-initial dashboard page load (`/dashboard/view`) passes it in the URL query
-string instead, because a browser navigation cannot set headers; this is a
-known, accepted limitation.
+The PURPLE API accepts two credentials: an HttpOnly session cookie, minted for the
+local operator at startup, or a token sent in the `X-Hermes-Token` request header
+(phone, other machines, scripts). `config/purple_auth.json` stores **only their SHA-256 hashes**
+(format 2): the clear token exists at the moment it is created and is shown
+once. A file read by mistake — a backup, a copy shared for debugging, a synced
+folder — no longer grants access.
 
-- **Token generation:** the initial token is generated with
-  `secrets.token_hex(32)` (a cryptographically random 256-bit value), created
-  fresh on first run. It is never derived from a fixed or guessable string.
-- **Token comparison:** token validation uses `hmac.compare_digest()`, a
-  constant-time comparison, to avoid timing-based side-channel attacks.
-- **Network exposure:** the API binds to `127.0.0.1` only. It is not reachable
-  from other devices on the local network or from the internet, even if the
-  host machine has other services exposed.
+- **One token per person or device.** Tokens carry a name and an id, so access
+  can be given to someone else and revoked individually, and every log entry
+  records which token (`utilizador`) made the call.
+- **Token generation:** `secrets.token_hex(32)` — a cryptographically random
+  256-bit value, always generated server-side. There is no caller-supplied
+  "base" and no derivation from a fixed string.
+- **Token comparison:** `hmac.compare_digest()` over every stored hash, so the
+  response time does not reveal which token failed (or that any did).
+- **Recovery:** if a token is lost, delete `config/purple_auth.json`; the next
+  start generates a new one and prints it once. `POST /token/regenerar` revokes
+  the presented token and issues a replacement with the same name.
+- **Migration:** a format-1 file (clear token) is converted automatically on
+  first load; the existing token keeps working, now stored as a hash.
+
+  An earlier version of this file claimed that the publicly computable
+  `sha256("hermes-default")` token had been found and fixed before release. The
+  fix had been applied to **initial generation only**: the rotation route still
+  defaulted to that base, so `POST /token/regenerar` with no body set the token
+  to a value printed in this document's source. That path is now gone, and the
+  rotation always generates a fresh random value.
+
+- **No token in the URL.** `/dashboard/view` is served as a shell: HTML and
+  JavaScript only, no data and no token embedded. Locally the page signs in with a single-use nonce (see *Local
+  sign-in*); remote clients send `X-Hermes-Token`, and the page keeps a pasted
+  token in `sessionStorage` for the lifetime of the tab. Any request carrying `?token=` is refused with `403` and recorded as
+  a `MEDIO` alert in the PURPLE alert log, so an old client cannot silently
+  fall back to the query-string path. An earlier version of this file described
+  the URL token as "a known, accepted limitation" — it is now removed, because
+  a token in the URL survives the request: it lands in the browser history, in
+  the `Referer` sent to third parties, and in the server access logs.
+- **Network exposure:** the API binds to `127.0.0.1` only, and that is enforced
+  in code rather than configuration: `endereco_bind()` refuses anything that is
+  not a literal loopback address, so one careless edit — or a tool rewriting
+  the file — raises inside the API thread before the server binds, instead of exposing the
+  service on a machine that has internet access. The process stays up, the health
+  check reports `api_thread_viva: false`, and recovery is manual (or the watchdog,
+  if it acts). It fails loudly, but it does not stop the program - stated here
+  rather than implied. It is not reachable from other devices on the local
+  network or from the internet, even if the host machine has other services
+  exposed.
+- **Rate limiting:** requests are limited per token and per client address. On a
+  loopback-only service every client shares the address `127.0.0.1`, so the
+  address limit works as a **global** bucket. That is deliberate: it protects
+  against a runaway local client (a bug that fires requests in a loop), while
+  the per-token limit is what tells clients apart.
+- **Host header validation:** only `127.0.0.1`, `localhost` and `::1` are
+  accepted, with or without a port. Anything else is refused with `400` before
+  authentication runs. This closes the DNS-rebinding path, where a domain
+  controlled by an attacker resolves to `127.0.0.1` and the victim's browser
+  then sends that domain in the `Host` header, making the local API reachable
+  from a page on the internet.
+
+### Local sign-in (no token to keep)
+
+Opening the dashboard locally used to require a token, which then had to live
+somewhere — a file, a password manager, or nowhere and the operator got locked
+out. None of that is a security control; it is friction.
+
+- The CLI generates a **single-use nonce** (60 s TTL, in memory only) and opens
+  `/dashboard/view#n=<nonce>`.
+- A URL **fragment** is never sent to the server, never appears in the
+  `Referer`, and never reaches access logs. The page trades the nonce for an
+  `HttpOnly; SameSite=Strict` session cookie and strips it from the URL with
+  `history.replaceState`.
+- The nonce is **consumed by the first attempt even if that attempt fails**, so
+  it cannot be guessed by repetition. It is also refused from non-loopback
+  addresses.
+- Sessions live in the server's memory: restarting Hermes invalidates them, and
+  the CLI opens a fresh nonce on every start. `POST /auth/logout` revokes one.
+- Tokens (tema 5) are unchanged and remain the way in for the phone, for other
+  machines, and for the friends who will be given access.
+
+The private window is still how Hermes opens the dashboard, and for a
+functional reason: dashboard requests to the local API fail in a normal window
+on the development machine (the tool buttons answer `NetworkError`), and
+extensions are disabled in a private window. It is no longer a token measure -
+the token does not travel in the URL, and the session cookie works in either
+kind of window.
+
+Residual exposure, stated plainly: a local process running as the same user
+could race the browser for the nonce during its 60 s window, and could read the
+browser profile anyway. The trust boundary here is the operating-system user,
+not the file.
+
+### Residual exposure: the development server's own log
+
+Flask's development server writes the request line to stderr, query string
+included. A request to `/dashboard/view?token=...` is refused with `403` and the
+API log records only `token_ref`, but the raw URL still lands in the process
+stderr, where it is neither rotated nor cleaned by Hermes. That is the residual
+exposure of the URL-token path: the API no longer stores it, the process output
+still does.
+
+## Tokens in logs and persisted state
+
+The API log (`logs/purple_api.log`) and the rate-limit state
+(`config/purple_ratelimit.json`) are plaintext files on disk. Neither holds a
+token: every entry carries `token_ref`, a truncated SHA-256 of the token derived from a
+separate context string (so it is not a prefix of the stored hash). That
+is enough to correlate requests made with the same token (and to spot repeated
+abuse) but not enough to reconstruct it.
+
+This was not always true. Earlier versions wrote the token on every call, the
+full token on authentication failures, the **newly issued** token on rotation,
+and used the token itself as a JSON key in the rate-limit file. **If you ran
+Hermes before this change: rotate the token** (`POST /token/regenerar`) and
+treat the old log files as secret material — delete them, or move them out of
+`logs/`.
+
+Authentication also happens before anything is logged as a call, so a rejected
+request produces only an `erro_autenticacao`/`acesso_negado` entry and the body
+of an unauthenticated request never reaches the log.
 
 An earlier version of this project generated the initial token as
 `sha256("hermes-default")` — a fixed, publicly computable value for anyone
 reading the source code. This was found and fixed before the project's public
 release, and is the reason the two points above exist.
+
+### No HTML is built from data
+
+The dashboard renders alert descriptions, signature names and interface names
+that originate outside Hermes (Suricata rules, log paths, remote banners). An
+earlier version interpolated them into `innerHTML`: a crafted signature was
+stored XSS inside an authenticated page. The page now builds every node with
+`textContent`/`createElement`, so the data is data.
+
+This matters more with a cookie session than it did with a header token: an
+injected script cannot read an `HttpOnly` cookie, but it can issue requests in
+the page's context while the tab is open.
 
 ## The lab_boundary invariant
 
@@ -69,6 +186,16 @@ just manual verification:
 - `test_intelligence_service.py` — `mission_target` always overrides any
   target the AI proposes, both for the default value and for an explicit
   user-supplied one.
+- `test_purple_auth.py` — the token is accepted in the `X-Hermes-Token` header
+  and refused everywhere else: no token, wrong token, and a valid token in the
+  query string all return `403`; the URL token is never copied into the API
+  log, and a request with `?token=` is recorded as an alert.
+- `test_purple_api_logger.py` — no code path writes a token in clear: calls,
+  authentication failures, token rotation and the rate-limit state file all
+  store only `token_ref`.
+- `test_purple_api_host.py` — local names are accepted, foreign and
+  suffix-spoofed names (`localhost.evil.com`, `127.0.0.1.nip.io`) are refused
+  with `400`, and the refusal happens before authentication.
 
 These tests run with `pytest tests/` and are intended to keep failing loudly
 if any of these invariants ever regresses, rather than relying on the author

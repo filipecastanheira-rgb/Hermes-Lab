@@ -1,13 +1,25 @@
 import json
 import time
 import os
+import hashlib
 
 
-def _mascarar(token):
-    """Never write a full token to the logs: keep only the first 4 characters."""
+def token_ref(token):
+    """Referencia estavel e nao reversivel para um token.
+
+    O log nao pode guardar o token: um ficheiro de log com tokens em claro e
+    um segredo em disco, e um log e copiado, enviado e arquivado com muito
+    menos cuidado do que a configuracao. Este resumo de 12 caracteres permite
+    correlacionar pedidos do mesmo token (e detetar abuso repetido) sem
+    permitir reconstruir o token a partir do log.
+
+    O prefixo "log:" evita que este valor seja um prefixo do resumo guardado em
+    purple_auth.json: os dois podem ser comparados, mas nenhum se deriva do outro
+    lendo um ficheiro de log.
+    """
     if not token:
-        return token
-    return str(token)[:4] + "..."
+        return None
+    return hashlib.sha256(("log:" + str(token)).encode()).hexdigest()[:12]
 
 
 class PurpleAPILogger:
@@ -19,6 +31,9 @@ class PurpleAPILogger:
     - erros de autenticação
     - acessos negados
     - regeneração de tokens
+
+    Os tokens nunca sao escritos em claro: aparece apenas `token_ref`, um
+    resumo SHA-256 truncado (ver `token_ref()`).
     """
 
     def __init__(self, ficheiro="logs/purple_api.log"):
@@ -44,11 +59,12 @@ class PurpleAPILogger:
     # ============================================================
     # Auditoria de chamadas
     # ============================================================
-    def log_chamada(self, endpoint, metodo, token, payload):
+    def log_chamada(self, endpoint, metodo, token, payload, utilizador=None):
         self._escrever("chamada", {
             "endpoint": endpoint,
             "metodo": metodo,
-            "token": _mascarar(token),
+            "utilizador": utilizador,
+            "token_ref": token_ref(token),
             "payload": payload
         })
 
@@ -69,7 +85,8 @@ class PurpleAPILogger:
     def log_erro_autenticacao(self, endpoint, token):
         self._escrever("erro_autenticacao", {
             "endpoint": endpoint,
-            "token": _mascarar(token)
+            "token_ref": token_ref(token),
+            "token_presente": bool(token)
         })
 
     # ============================================================
@@ -84,6 +101,8 @@ class PurpleAPILogger:
     # ============================================================
     # Regeneração de tokens
     # ============================================================
-    def log_token_regenerado(self):
-        self._escrever("token_regenerado", {})
+    def log_token_regenerado(self, novo_token):
+        self._escrever("token_regenerado", {
+            "token_ref": token_ref(novo_token)
+        })
 

@@ -79,9 +79,18 @@ cp config/intelligence_config.example.json config/intelligence_config.json
 python3 hermes_cli.py
 ```
 
-This starts the PURPLE service (API, background monitoring, dashboard) and opens the dashboard in a Firefox **private window**. From there, pick a tool, set a target, and run it. Run the tests with `pytest tests/`.
+This starts the PURPLE service (API, background monitoring, dashboard) and opens the dashboard in your default browser, already signed in: the CLI generates a single-use nonce and puts it in the URL fragment, which the page trades for an `HttpOnly` session cookie. Nothing to paste, nothing to store, and nothing in the URL that reaches the server. Tokens exist for clients that are not this machine — the phone, another host, a script — and are sent in the `X-Hermes-Token` header. Run the tests with `pytest tests/`.
 
-**Why a private window:** API calls authenticate with an `X-Hermes-Token` header, and the initial page load carries the token in the URL (a browser navigation cannot set headers). Some privacy extensions block requests shaped this way, and the dashboard then fails with a generic "NetworkError"; a private window, where extensions are normally disabled, avoids that. If Firefox is not installed, Hermes falls back to your default browser and prints the URL.
+**Why a private window:** Hermes opens the dashboard with `firefox --private-window`.
+This is a functional requirement, not a security one. Requests from the dashboard to the
+local API fail in a normal window on this system, and the visible symptom is the tool
+buttons (nmap, Zeek, Suricata) answering `NetworkError`; in a private window extensions
+are disabled and those requests go through. It is also not a token measure any more: the
+token is no longer in the URL, and the page signs in with a single-use nonce.
+
+So the private window stays as the default, with the reason written down. If Firefox is
+not installed, Hermes falls back to the default browser and prints the URL - in that case
+the tools may need the URL opened manually in a private window.
 
 ## Known limitations
 
