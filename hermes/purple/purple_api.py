@@ -882,9 +882,16 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
       atualizar();
     }
   } catch (e) {
-    resultadoEl.textContent = "Error: " + e;
+    // fetch rejects with a TypeError when the connection fails or is cut. The
+    // server may still have finished the run, so say that instead of a bare
+    // "NetworkError", and refresh the alerts.
+    const msg = (e instanceof TypeError)
+      ? "Connection lost before the server answered. The run may still have finished: check Recent alerts, or run again."
+      : "Error: " + e;
+    resultadoEl.textContent = msg;
     resultadoEl.style.color = "#f85149";
-    relatorioEl.textContent = "Error: " + e;
+    relatorioEl.textContent = msg;
+    atualizar();
   }
 });
 
