@@ -9,10 +9,7 @@ made "one token per person" unusable in practice.
 def criar(store, nome="token"):
     """Create a token and return (id, token). The token is shown once."""
     token = store.criar(nome)
-    for t in store.listar():
-        if t["nome"] == str(nome)[:40] and t["criado_em"] == store.dados["tokens"][-1]["criado_em"]:
-            return t["id"], token
-    return None, token
+    return store.dados["tokens"][-1]["id"], token
 
 
 def listar(store):

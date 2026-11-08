@@ -45,3 +45,14 @@ def test_revogar_id_inexistente_devolve_false(store):
 
 def test_lista_vazia_tem_mensagem_propria():
     assert T.formatar_lista([]) == "No tokens configured."
+
+
+def test_criar_dois_tokens_mesmo_nome_no_mesmo_segundo(store, monkeypatch):
+    monkeypatch.setattr("hermes.purple.purple_auth.time.ctime", lambda: "Sun Nov  8 10:00:00 2026")
+
+    id_a, token_a = T.criar(store, "kali")
+    id_b, token_b = T.criar(store, "kali")
+
+    assert id_a != id_b
+    assert store.validar(token_a)["id"] == id_a
+    assert store.validar(token_b)["id"] == id_b
