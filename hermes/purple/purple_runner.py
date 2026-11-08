@@ -106,19 +106,19 @@ class PurpleRunner:
         self.watchdog = PurpleWatchdog(self.logger)
 
     def iniciar(self):
-        self.logger.info("A iniciar Hermes PURPLE...")
+        self.logger.info("Starting Hermes PURPLE...")
 
         try:
             self.webhooks.enviar({
                 "tipo": "startup",
-                "descricao": "Hermes PURPLE iniciado",
+                "descricao": "Hermes PURPLE started",
                 "config": self.config.config,
             })
         except Exception:
-            self.logger.warn("Falha ao enviar webhook de startup (PURPLE).")
+            self.logger.warn("Failed to send startup webhook (PURPLE).")
 
         self._api_thread.start()
-        self.logger.info("API PURPLE iniciada em thread separada.")
+        self.logger.info("PURPLE API started in a separate thread.")
         # Arranca a vigilancia continua das ferramentas de fundo
         # (Suricata, Zeek) - Fase 0 raw/clean, nunca deve impedir o
         # PURPLE de arrancar se falhar. Isto e passivo (escuta trafego
@@ -133,9 +133,9 @@ class PurpleRunner:
                 "suricata": "/var/log/suricata/eve.json",
                 "zeek": "/opt/zeek/logs/current/conn.log",
             })
-            self.logger.info("Vigilancia continua (Suricata/Zeek) iniciada.")
+            self.logger.info("Continuous monitoring (Suricata/Zeek) started.")
         except Exception as e:
-            self.logger.error(f"Falha ao iniciar vigilancia continua: {e}")
+            self.logger.error(f"Failed to start continuous monitoring: {e}")
 
         self._loop_principal()
 
@@ -145,7 +145,7 @@ class PurpleRunner:
         while True:
             inicio = time.time()
 
-            self.logger.heartbeat("PURPLE ativo")
+            self.logger.heartbeat("PURPLE active")
             self.metrics.incrementar("heartbeat_purple")
 
             # Health-check protegido — uma falha aqui NUNCA deve matar
@@ -157,7 +157,7 @@ class PurpleRunner:
                 estado = {"ok": False}
 
             if not estado.get("ok", True):
-                self.logger.error("Health-check PURPLE falhou", extra=estado)
+                self.logger.error("PURPLE health-check failed", extra=estado)
                 self.metrics.incrementar("healthcheck_falha")
 
                 try:
@@ -174,7 +174,7 @@ class PurpleRunner:
                     removidos = apply_retention()
                     self.logger.info(f"Retencao aplicada: {removidos}")
                 except Exception as e:
-                    self.logger.error(f"Retencao falhou: {e}")
+                    self.logger.error(f"Retention failed: {e}")
                 self._ultima_retencao = time.time()
 
             # Sem decisao autonoma aqui por design (ver nota no topo do

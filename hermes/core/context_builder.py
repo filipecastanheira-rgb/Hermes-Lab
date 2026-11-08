@@ -100,6 +100,6 @@ def build_context(question: str, *, config=None, now=None, source=None, event_ty
     config = config or ContextConfig()
     events = select_events(load_events(config, now=now, source=source, event_type=event_type, target=target, mission_id=mission_id), max_events=config.max_events, max_chars=config.max_chars)
     payload = {"question": question.strip(), "window_hours": config.lookback_hours, "event_count": len(events), "events": events}
-    return ("HERMES_CONTEXT\nUse apenas os eventos abaixo como evidência factual. Se a informação não estiver presente, diga explicitamente que não há evidência suficiente nos eventos fornecidos. Não invente hosts, IPs, vulnerabilidades, ações ou resultados.\n\n" + _json_compact(payload))
+    return ("HERMES_CONTEXT\nUse only the events below as factual evidence. If the information is not present, state explicitly that there is not enough evidence in the events provided. Do not invent hosts, IPs, vulnerabilities, actions or results.\n\n" + _json_compact(payload))
 
 __all__ = ["ContextConfig", "load_events", "select_events", "build_context"]

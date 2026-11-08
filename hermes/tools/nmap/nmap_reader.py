@@ -71,7 +71,7 @@ def parse_evento(dados_brutos: dict) -> dict | None:
             raw_ref=raw_ref,
         )
     except Exception as e:
-        print(f"[NMAP_READER] Aviso: falha ao escrever clean/: {e}")
+        print(f"[NMAP_READER] Warning: failed to write clean/: {e}")
 
     return evento
 
@@ -86,7 +86,7 @@ def _correr_scan(alvo: str) -> list:
     persistido em raw/ (para não atrasar a resposta ao utilizador).
     """
     if not alvo_permitido(alvo):
-        print(f"[NMAP_READER] Alvo fora do laboratório autorizado, recusado: {alvo}")
+        print(f"[NMAP_READER] Target outside the authorized lab, refused: {alvo}")
         return []
 
     try:
@@ -95,14 +95,14 @@ def _correr_scan(alvo: str) -> list:
             capture_output=True, text=True, timeout=120,
         )
     except FileNotFoundError:
-        print("[NMAP_READER] 'nmap' não está instalado.")
+        print("[NMAP_READER] 'nmap' is not installed.")
         return []
     except subprocess.TimeoutExpired:
         print(f"[NMAP_READER] Scan a {alvo} excedeu o tempo limite.")
         return []
 
     if resultado.returncode != 0:
-        print(f"[NMAP_READER] Erro ao correr nmap: {resultado.stderr[:200]}")
+        print(f"[NMAP_READER] Error running nmap: {resultado.stderr[:200]}")
         return []
 
     portas_brutas = []
@@ -111,7 +111,7 @@ def _correr_scan(alvo: str) -> list:
     try:
         raiz = ET.fromstring(resultado.stdout)
     except ET.ParseError:
-        print("[NMAP_READER] Não foi possível interpretar o XML do nmap.")
+        print("[NMAP_READER] Could not parse the nmap XML.")
         return []
 
     for host in raiz.findall("host"):
@@ -141,7 +141,7 @@ def _correr_scan(alvo: str) -> list:
             for p in portas_brutas:
                 p["_raw_ref"] = raw_ref
         except Exception as e:
-            print(f"[NMAP_READER] Aviso: falha ao escrever raw/: {e}")
+            print(f"[NMAP_READER] Warning: failed to write raw/: {e}")
 
     return portas_brutas
 
@@ -162,7 +162,7 @@ def vigiar(router, alvo: str, intervalo: int = 300):
     segundos (5 min por defeito), enviando cada evento encontrado ao
     pipeline BLUE. Ctrl+C para parar.
     """
-    print(f"[NMAP_READER] A vigiar '{alvo}' a cada {intervalo}s... (Ctrl+C para parar)")
+    print(f"[NMAP_READER] Watching '{alvo}' every {intervalo}s... (Ctrl+C to stop)")
 
     while True:
         eventos = ler_uma_vez(alvo)

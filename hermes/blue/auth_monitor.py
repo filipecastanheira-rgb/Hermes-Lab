@@ -1,6 +1,6 @@
 class AuthMonitor:
     def __init__(self, router=None):
-        print("[AUTH] Módulo auth_monitor iniciado.")
+        print("[AUTH] Module auth_monitor started.")
         self.router = router
 
         # Contador de falhas por IP
@@ -19,7 +19,7 @@ class AuthMonitor:
 
         falhas = self.falhas_por_ip[ip]
 
-        print(f"[AUTH] Falha de login detectada em {ip} (falhas consecutivas: {falhas})")
+        print(f"[AUTH] Login failure detected from {ip} (consecutive failures: {falhas})")
 
         evento = {
             "tipo": "login_fail",

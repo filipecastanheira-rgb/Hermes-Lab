@@ -49,12 +49,12 @@ class PurpleAlerts:
         }
 
         self.logger.info(
-            f"ALERTA [{severidade}] — origem={origem} — descricao={descricao} — contexto={alerta['contexto']}"
+            f"ALERT [{severidade}] — source={origem} — description={descricao} — context={alerta['contexto']}"
         )
 
-        print(f"\n[ALERTA PURPLE] ({severidade}) {descricao}")
+        print(f"\n[PURPLE ALERT] ({severidade}) {descricao}")
         print(f" - Origem: {origem}")
-        print(f" - Contexto: {alerta['contexto']}\n")
+        print(f" - Context: {alerta['contexto']}\n")
 
         self._persistir(alerta)
 
@@ -63,13 +63,13 @@ class PurpleAlerts:
     def alerta_modulo_falhou(self, modulo):
         return self.emitir_alerta(
             severidade="CRITICO", origem="watchdog",
-            descricao=f"Módulo '{modulo}' falhou.", contexto={"modulo": modulo},
+            descricao=f"Module '{modulo}' failed.", contexto={"modulo": modulo},
         )
 
     def alerta_modulo_reiniciado(self, modulo):
         return self.emitir_alerta(
             severidade="INFO", origem="watchdog",
-            descricao=f"Módulo '{modulo}' reiniciado automaticamente.", contexto={"modulo": modulo},
+            descricao=f"Module '{modulo}' restarted automatically.", contexto={"modulo": modulo},
         )
 
     def alerta_evento_suspeito(self, evento):

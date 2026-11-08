@@ -9,7 +9,7 @@ duas vezes (copy-paste). Fica só uma versão, a completa.
 class AlertEngine:
     def __init__(self):
         self.regras = []
-        print("[ALERT] Módulo alert_engine iniciado.")
+        print("[ALERT] Module alert_engine started.")
 
     def adicionar_regra(self, regra_func):
         self.regras.append(regra_func)
@@ -23,10 +23,10 @@ class AlertEngine:
                 if regra(evento):
                     regras_disparadas.append(regra.__name__)
             except Exception as e:
-                print(f"[ALERT] Erro na regra {regra.__name__}: {e}")
+                print(f"[ALERT] Error in rule {regra.__name__}: {e}")
 
         if regras_disparadas:
-            print(f"[ALERT] ALERTA DISPARADO pelas regras: {regras_disparadas}")
+            print(f"[ALERT] ALERT TRIGGERED by rules: {regras_disparadas}")
             return True
 
         return False

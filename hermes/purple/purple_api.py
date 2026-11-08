@@ -35,9 +35,9 @@ def endereco_bind(host=None):
     alvo = HOST_BIND if host is None else host
     if alvo not in BINDS_PERMITIDOS:
         raise ValueError(
-            f"Bind recusado: {alvo!r}. A API PURPLE so pode escutar em loopback "
-            f"({', '.join(sorted(BINDS_PERMITIDOS))}). Para expor o servico na rede "
-            "seria preciso alterar esta invariante de proposito."
+            f"Bind refused: {alvo!r}. The PURPLE API can only listen on loopback "
+            f"({', '.join(sorted(BINDS_PERMITIDOS))}). To expose the service on the network "
+            "this invariant would have to be changed on purpose."
         )
     return alvo
 
@@ -197,7 +197,7 @@ class PurpleAPI:
             o Same-Origin Policy.
             """
             if not host_permitido(request.headers.get("Host", "")):
-                return Response("Host nao permitido", status=400, mimetype="text/plain")
+                return Response("Host not allowed", status=400, mimetype="text/plain")
             return None
 
         self._definir_rotas()
@@ -223,11 +223,11 @@ class PurpleAPI:
             self.alerts.emitir_alerta(
                 severidade="MEDIO",
                 origem="purple_api",
-                descricao=f"Pedido com token na URL recusado em {endpoint}",
+                descricao=f"Request with token in URL refused on {endpoint}",
                 contexto={"endpoint": endpoint, "ip": request.remote_addr},
             )
         return jsonify({
-            "erro": "Token na URL nao e aceite. Usa o cabecalho X-Hermes-Token."
+            "erro": "Token in the URL is not accepted. Use the X-Hermes-Token header."
         }), 403
 
     def _require_token(self, func):
@@ -250,11 +250,11 @@ class PurpleAPI:
             # token e que distingue clientes entre si.
             if not self.ratelimit.verificar_ip(ip):
                 self.api_logger.log_acesso_negado(endpoint, f"Rate limit IP excedido ({ip})")
-                return jsonify({"erro": "Rate limit excedido para este IP"}), 429
+                return jsonify({"erro": "Rate limit exceeded for this IP"}), 429
 
             if token and not self.ratelimit.verificar_token(token):
                 self.api_logger.log_acesso_negado(endpoint, "Rate limit do token excedido")
-                return jsonify({"erro": "Rate limit excedido para este token"}), 429
+                return jsonify({"erro": "Rate limit exceeded for this token"}), 429
 
             sid = request.cookies.get("hermes_session")
             if sid and self.bootstrap.sessao_valida(sid):
@@ -263,7 +263,7 @@ class PurpleAPI:
                 identidade = self.auth.validar(token) if token else None
             if identidade is None:
                 self.api_logger.log_erro_autenticacao(endpoint, token)
-                return jsonify({"erro": "Token inválido ou ausente"}), 403
+                return jsonify({"erro": "Invalid or missing token"}), 403
 
             # Uma cookie viaja sozinha em qualquer pedido que o browser faca a
             # este host, por isso um pedido que altera estado tem de provar que
@@ -277,10 +277,10 @@ class PurpleAPI:
                         self.alerts.emitir_alerta(
                             severidade="MEDIO",
                             origem="purple_api",
-                            descricao=f"Pedido com cookie e Origin diferente recusado em {endpoint}",
+                            descricao=f"Request with cookie and mismatched Origin refused on {endpoint}",
                             contexto={"endpoint": endpoint, "origem": request.headers.get("Origin")},
                         )
-                    return jsonify({"erro": "Origem não permitida."}), 403
+                    return jsonify({"erro": "Origin not allowed."}), 403
 
             # Quem fez o pedido, para o log e para as rotas que precisam de o saber
             request.environ["hermes.token"] = identidade
@@ -309,7 +309,7 @@ class PurpleAPI:
             try:
                 self.webhooks.enviar(webhook_evento)
             except Exception:
-                self.logger.warn(f"Falha ao enviar webhook da API ({endpoint}).")
+                self.logger.warn(f"Failed to send API webhook ({endpoint}).")
 
         aceita_gzip = "gzip" in request.headers.get("Accept-Encoding", "").lower()
 
@@ -334,9 +334,9 @@ class PurpleAPI:
             if sid is None:
                 self.api_logger.log_acesso_negado(
                     "/auth/bootstrap",
-                    "Nonce de arranque invalido, expirado ou ja usado",
+                    "Startup nonce invalid, expired or already used",
                 )
-                return jsonify({"erro": "Nonce invalido."}), 403
+                return jsonify({"erro": "Invalid nonce."}), 403
 
             resposta = jsonify({"ok": True})
             resposta.set_cookie("hermes_session", sid, httponly=True, samesite="Strict", path="/")
@@ -385,7 +385,7 @@ class PurpleAPI:
 
             return self._responder(
                 "/comando", resposta,
-                webhook_evento={"tipo": "comando", "descricao": "Comando executado via API PURPLE",
+                webhook_evento={"tipo": "comando", "descricao": "Command executed via PURPLE API",
                                 "comando": cmd, "valor": valor, "resultado": resultado},
             )
 
@@ -393,7 +393,7 @@ class PurpleAPI:
         @self._require_token
         def alerta_manual():
             dados = request.json or {}
-            descricao = dados.get("descricao", "Alerta manual via API")
+            descricao = dados.get("descricao", "Manual alert via API")
             severidade = dados.get("severidade", "ALTO")
             contexto = dados.get("contexto", {})
 
@@ -414,16 +414,16 @@ class PurpleAPI:
             valor = dados.get("valor")
 
             if chave not in self.config.config:
-                self.api_logger.log_acesso_negado("/config", "Chave inválida")
-                return jsonify({"erro": "Chave de configuração inválida"}), 400
+                self.api_logger.log_acesso_negado("/config", "Invalid key")
+                return jsonify({"erro": "Invalid configuration key"}), 400
 
             self.config.atualizar(chave, valor)
-            resposta = {"resultado": f"Configuração '{chave}' atualizada para {valor}"}
+            resposta = {"resultado": f"Configuration '{chave}' set to {valor}"}
             self.cache.guardar("config", resposta)
 
             return self._responder(
                 "/config", resposta,
-                webhook_evento={"tipo": "config", "descricao": "Configuração PURPLE alterada via API", "chave": chave, "valor": valor},
+                webhook_evento={"tipo": "config", "descricao": "PURPLE configuration changed via API", "chave": chave, "valor": valor},
             )
 
         @self.app.route("/token/regenerar", methods=["POST"])
@@ -442,7 +442,7 @@ class PurpleAPI:
             identidade = request.environ.get("hermes.token") or {}
             novo_token = self.auth.regenerar(identidade.get("id"))
             if novo_token is None:
-                return jsonify({"erro": "Token desconhecido."}), 404
+                return jsonify({"erro": "Unknown token."}), 404
 
             self.api_logger.log_token_regenerado(novo_token)
 
@@ -452,18 +452,18 @@ class PurpleAPI:
                     self.webhooks.enviar({"tipo": "token", "descricao": "Token regenerado via API PURPLE"})
             except Exception:
                 if getattr(self, "logger", None) is not None:
-                    self.logger.warn("Falha ao enviar webhook da rotacao de token.")
+                    self.logger.warn("Failed to send token rotation webhook.")
 
             return jsonify({
                 "novo_token": novo_token,
-                "aviso": "Guarda este token agora: nao volta a ser mostrado.",
+                "aviso": "Save this token now: it will not be shown again.",
             }), 200
 
         @self.app.route("/dashboard", methods=["GET"])
         @self._require_token
         def dashboard():
             if self.dashboard is None:
-                return jsonify({"erro": "Dashboard não está configurado."}), 501
+                return jsonify({"erro": "Dashboard is not configured."}), 501
 
             dados = self.dashboard.gerar_dashboard()
             return self._responder("/dashboard", dados)
@@ -479,7 +479,7 @@ class PurpleAPI:
             cabecalhos) sem voltar a por o token na URL.
             """
             if self.dashboard is None:
-                return "<h1>Dashboard não está configurado.</h1>", 501
+                return "<h1>Dashboard is not configured.</h1>", 501
 
             recusa = self._recusar_token_na_url(request.path)
             if recusa is not None:
@@ -527,11 +527,11 @@ class PurpleAPI:
             try:
                 eventos = ler_uma_vez_todas({tool: target})
             except Exception as e:
-                self.logger.error(f"Falha ao correr '{tool}' contra '{target}': {e}")
+                self.logger.error(f"Failed to run '{tool}' against '{target}': {e}")
                 self.alerts.emitir_alerta(
                     severidade="ERROR",
                     origem=tool,
-                    descricao=f"Execucao falhou: {e}",
+                    descricao=f"Execution failed: {e}",
                     contexto={"tool": tool, "target": target},
                 )
                 return jsonify({
@@ -587,7 +587,7 @@ class PurpleAPI:
         Arranca o servidor Flask. Corre em thread separada, arrancada
         pelo purple_runner.
         """
-        self.logger.info(f"API PURPLE a arrancar na porta {porta}.")
+        self.logger.info(f"PURPLE API starting on port {porta}.")
         # threaded=True (2026-08-30): sem isto, o servidor de desenvolvimento
         # do Flask e single-threaded - um pedido longo (ex: /run_tool com
         # openvas, que pode demorar minutos) bloqueava TODOS os outros
@@ -623,11 +623,11 @@ _DASHBOARD_HTML = """
 <div class="sub">Refreshes automatically every 5s · <span id="ultima-atualizacao" class="status">loading...</span></div>
 
 <div class="card" id="login" style="margin-bottom:24px; display:none;">
-  <h2>Token de acesso</h2>
+  <h2>Access token</h2>
   <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-    <input id="token-input" type="password" autocomplete="off" placeholder="cola aqui o token que o Hermes mostrou no terminal"
+    <input id="token-input" type="password" autocomplete="off" placeholder="paste the token Hermes printed in the terminal"
            style="background:#0f1117; color:#e6e6e6; border:1px solid #30363d; padding:8px; border-radius:6px; flex:1; min-width:240px;">
-    <button id="token-entrar" style="background:#238636; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer;">Entrar</button>
+    <button id="token-entrar" style="background:#238636; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer;">Sign in</button>
   </div>
   <div id="token-msg" style="font-size:0.8rem; color:#f85149; margin-top:6px;"></div>
 </div>
@@ -743,11 +743,11 @@ async function entrar() {
   } else {
     TOKEN = "";
     if (!ULTIMO_ERRO || ULTIMO_ERRO.status === 403) {
-      $("token-msg").textContent = "Token inválido.";
+      $("token-msg").textContent = "Invalid token.";
     } else if (ULTIMO_ERRO.rede) {
-      $("token-msg").textContent = "Sem ligação ao servidor.";
+      $("token-msg").textContent = "Cannot reach the server.";
     } else {
-      $("token-msg").textContent = "Erro HTTP " + ULTIMO_ERRO.status + ".";
+      $("token-msg").textContent = "HTTP error " + ULTIMO_ERRO.status + ".";
     }
   }
 }
@@ -759,7 +759,7 @@ $("token-input").addEventListener("keydown", (e) => {
 
 async function atualizar() {
   if (!SESSAO && !TOKEN) {
-    $("ultima-atualizacao").textContent = "sem sessão";
+    $("ultima-atualizacao").textContent = "no session";
     mostrarLogin("");
     return false;
   }
@@ -771,9 +771,9 @@ async function atualizar() {
         SESSAO = false;
         TOKEN = "";
         sessionStorage.removeItem("hermes_token");
-        mostrarLogin("Sessão expirada. Cola o token ou reinicia o Hermes.");
+        mostrarLogin("Session expired. Paste the token or restart Hermes.");
       }
-      $("ultima-atualizacao").textContent = "erro a atualizar: HTTP " + r.status;
+      $("ultima-atualizacao").textContent = "update error: HTTP " + r.status;
       return false;
     }
     const d = await r.json();
@@ -784,7 +784,7 @@ async function atualizar() {
     $("cartoes").replaceChildren(
       cartao("Status", d.estado || "?"),
       cartao("Heartbeats PURPLE", contadores.heartbeat_purple || 0),
-      cartao("Falhas de health-check", contadores.healthcheck_falha || 0),
+      cartao("Health-check failures (this run)", contadores.healthcheck_falha || 0),
       cartao("Operation", "manual")
     );
 
@@ -802,7 +802,7 @@ async function atualizar() {
       const td = document.createElement("td");
       td.colSpan = 3;
       td.className = "vazio";
-      td.textContent = "Sem alertas ainda.";
+      td.textContent = "No alerts yet.";
       tr.append(td);
       tbody.replaceChildren(tr);
     } else {
@@ -821,11 +821,11 @@ async function atualizar() {
       );
     }
 
-    $("ultima-atualizacao").textContent = "última atualização: " + new Date().toLocaleTimeString();
+    $("ultima-atualizacao").textContent = "last update: " + new Date().toLocaleTimeString();
     return true;
   } catch (e) {
     ULTIMO_ERRO = {rede: true};
-    $("ultima-atualizacao").textContent = "erro a atualizar: " + e;
+    $("ultima-atualizacao").textContent = "update error: " + e;
     return false;
   }
 }
@@ -855,7 +855,7 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
 
   resultadoEl.textContent = "Running... (can take up to 2 min, especially for openvas)";
   resultadoEl.style.color = "#8b949e";
-  relatorioEl.textContent = "a gerar relatório...";
+  relatorioEl.textContent = "generating report...";
 
   try {
     const r = await pedir("/run_tool", {
@@ -868,7 +868,7 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
     if (!r.ok) {
       resultadoEl.textContent = d.error || "Blocked.";
       resultadoEl.style.color = "#f85149";
-      relatorioEl.textContent = d.error || "Bloqueado.";
+      relatorioEl.textContent = d.error || "Blocked.";
     } else {
       resultadoEl.textContent = d.events_found + " event(s) found.";
       resultadoEl.style.color = "#7ee787";
@@ -878,7 +878,7 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
   } catch (e) {
     resultadoEl.textContent = "Error: " + e;
     resultadoEl.style.color = "#f85149";
-    relatorioEl.textContent = "Erro: " + e;
+    relatorioEl.textContent = "Error: " + e;
   }
 });
 

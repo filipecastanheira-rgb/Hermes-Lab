@@ -40,18 +40,18 @@ from hermes.tools.agregador_ferramentas import ler_uma_vez_todas
 FERRAMENTAS_PERMITIDAS_IA = {
     "run_nmap": {
         "nome_interno": "nmap",
-        "descricao": "Corre um scan Nmap a um alvo especifico dentro do lab_boundary.",
+        "descricao": "Runs an Nmap scan against a specific target inside the lab_boundary.",
         "tipo_alvo": "ip",
     },
     "run_tshark": {
         "nome_interno": "tshark",
-        "descricao": "Captura trafego com TShark. A interface e sempre fixa (nunca escolhida pela IA).",
+        "descricao": "Captures traffic with TShark. The interface is always fixed (never chosen by the AI).",
         "tipo_alvo": "interface_fixa",
         "interface_fixa": "lo",
     },
     "run_openvas": {
         "nome_interno": "openvas",
-        "descricao": "Corre um scan de vulnerabilidades OpenVAS/Greenbone a um alvo especifico dentro do lab_boundary. Scan pesado e demorado (pode levar varios minutos) - usar com moderacao.",
+        "descricao": "Runs an OpenVAS/Greenbone vulnerability scan against a specific target inside the lab_boundary. Heavy and slow scan (can take several minutes) - use sparingly.",
         "tipo_alvo": "ip",
     },
 }
@@ -63,7 +63,7 @@ def construir_schemas_tools():
         if info["tipo_alvo"] == "ip":
             descricao_target = "IP ou rede a analisar, tem de estar dentro do lab_boundary"
         else:
-            descricao_target = "Nao usado - a interface de captura e sempre fixa, ignorado se enviado"
+            descricao_target = "Not used - the capture interface is always fixed, ignored if sent"
         schemas.append({
             "type": "function",
             "function": {

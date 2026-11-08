@@ -29,12 +29,12 @@ class BluePipeline:
             with open(self.config_path, "r") as f:
                 config = json.load(f)
         except Exception as e:
-            print(f"[ERRO] Falha ao carregar config: {e}")
+            print(f"[ERROR] Failed to load config: {e}")
             return
         self.modulos_ativos = config.get("modulos", [])
 
     def iniciar(self):
-        print(f"[BLUE] Módulos ativos: {self.modulos_ativos}")
+        print(f"[BLUE] Active modules: {self.modulos_ativos}")
         for modulo in self.modulos_ativos:
             self._ativar_modulo(modulo)
 
@@ -50,4 +50,4 @@ class BluePipeline:
         elif modulo == "correlator":
             self.correlator = Correlator(router=self)
         else:
-            print(f"[BLUE] Módulo desconhecido: {modulo}")
+            print(f"[BLUE] Unknown module: {modulo}")

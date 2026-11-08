@@ -11,7 +11,7 @@ import socket
 
 class Scanner:
     def __init__(self, router=None):
-        print("[SCANNER] Módulo iniciado.")
+        print("[SCANNER] Module started.")
         self.router = router
         self.alertas_consecutivos = 0
 
@@ -22,7 +22,7 @@ class Scanner:
         try:
             result = sock.connect_ex((ip, port))
         except Exception as e:
-            print(f"[SCANNER] Erro ao conectar: {e}")
+            print(f"[SCANNER] Connection error: {e}")
             return
         finally:
             sock.close()
@@ -50,7 +50,7 @@ class Scanner:
             try:
                 result = sock.connect_ex((ip, porta))
             except Exception as e:
-                print(f"[SCANNER] Erro ao conectar na porta {porta}: {e}")
+                print(f"[SCANNER] Connection error on port {porta}: {e}")
                 continue
             finally:
                 sock.close()

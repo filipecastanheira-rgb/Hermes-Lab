@@ -35,7 +35,7 @@ class HermesIntelligence:
 
     def gerar(self, prompt):
         if self.provider == "none":
-            return "[Hermes] Provider de IA não configurado (modo 'none')."
+            return "[Hermes] AI provider not configured (mode 'none')."
 
         if self.provider == "ollama":
             return self._usar_ollama(prompt)
@@ -43,7 +43,7 @@ class HermesIntelligence:
         if self.provider == "openai":
             return self._usar_openai(prompt)
 
-        return f"[Hermes] Provider '{self.provider}' desconhecido."
+        return f"[Hermes] Unknown provider '{self.provider}'."
 
     def _usar_ollama(self, prompt):
         import requests
@@ -61,10 +61,10 @@ class HermesIntelligence:
                 timeout=200,
             )
             if r.status_code != 200:
-                return f"[Hermes] Erro Ollama: {r.text[:200]}"
+                return f"[Hermes] Ollama error: {r.text[:200]}"
             return r.json().get("response", "")
         except Exception as e:
-            return f"[Hermes] Ollama não está a correr ou não está acessível: {e}"
+            return f"[Hermes] Ollama is not running or not reachable: {e}"
 
     def gerar_com_tools(self, prompt, tools):
         """
@@ -86,7 +86,7 @@ class HermesIntelligence:
                 timeout=30,
             )
             if r.status_code != 200:
-                return {"erro": f"[Hermes] Erro Ollama (tools): {r.text[:200]}"}
+                return {"erro": f"[Hermes] Ollama (tools) error: {r.text[:200]}"}
             data = r.json()
             message = data.get("message", {})
             return {
@@ -94,14 +94,14 @@ class HermesIntelligence:
                 "content": message.get("content", ""),
             }
         except Exception as e:
-            return {"erro": f"[Hermes] Ollama (tools) nao esta a correr ou nao esta acessivel: {e}"}
+            return {"erro": f"[Hermes] Ollama (tools) is not running or not reachable: {e}"}
 
     def _usar_openai(self, prompt):
         import requests
         api_key = self.config.get("api_key", "")
         model = self.model or "gpt-4o-mini"
         if not api_key:
-            return "[Hermes] OpenAI API key não configurada."
+            return "[Hermes] OpenAI API key not configured."
         try:
             r = requests.post(
                 "https://api.openai.com/v1/chat/completions",
@@ -110,10 +110,10 @@ class HermesIntelligence:
                 timeout=15,
             )
             if r.status_code != 200:
-                return f"[Hermes] Erro OpenAI ({r.status_code}): {r.text[:200]}"
+                return f"[Hermes] OpenAI error ({r.status_code}): {r.text[:200]}"
             return r.json()["choices"][0]["message"]["content"]
         except Exception as e:
-            return f"[Hermes] Erro ao contactar OpenAI: {e}"
+            return f"[Hermes] Error contacting OpenAI: {e}"
 
 
 def definir_provider(provider, model=""):

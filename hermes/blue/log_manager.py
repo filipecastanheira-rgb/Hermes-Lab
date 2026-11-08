@@ -11,8 +11,8 @@ class LogManager:
 
         self.log_file = os.path.join(self.log_dir, "hermes.log")
 
-        print("[LOG] Módulo log_manager iniciado.")
-        print(f"[LOG] Ficheiro de logs: {self.log_file}")
+        print("[LOG] Module log_manager started.")
+        print(f"[LOG] Log file: {self.log_file}")
 
     def _timestamp(self):
         """
@@ -32,7 +32,7 @@ class LogManager:
             print(f"[LOG] {mensagem}")
 
         except Exception as e:
-            print(f"[LOG] Erro ao escrever log: {e}")
+            print(f"[LOG] Error writing log: {e}")
 
     def registar_evento(self, evento):
         """
@@ -43,5 +43,5 @@ class LogManager:
             self.escrever(linha)
 
         except Exception as e:
-            print(f"[LOG] Erro ao registar evento: {e}")
+            print(f"[LOG] Error recording event: {e}")
 

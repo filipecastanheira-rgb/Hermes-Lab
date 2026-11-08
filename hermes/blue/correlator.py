@@ -1,6 +1,6 @@
 class Correlator:
     def __init__(self, router=None):
-        print("[CORRELATOR] Módulo correlator iniciado.")
+        print("[CORRELATOR] Module correlator started.")
         self.router = router
 
         # Histórico de tipos de eventos suspeitos por IP

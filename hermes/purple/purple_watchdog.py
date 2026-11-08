@@ -27,9 +27,9 @@ class PurpleWatchdog:
 
         for componente in componentes_falhados:
             if componente == "api_thread_viva":
-                self.logger.warn("Watchdog: thread da API PURPLE morreu. Recuperação automática ainda não implementada — precisa de reinício manual.")
+                self.logger.warn("Watchdog: PURPLE API thread died. Automatic recovery is not implemented yet - manual restart required.")
             else:
-                self.logger.warn(f"Watchdog: componente '{componente}' em falha. Recuperação automática ainda não implementada.")
+                self.logger.warn(f"Watchdog: component '{componente}' failed. Automatic recovery is not implemented yet.")
 
         # Recuperação automática real é o próximo passo, não finjas sucesso agora
         return False

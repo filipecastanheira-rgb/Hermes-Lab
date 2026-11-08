@@ -40,14 +40,14 @@ class PurpleConfig:
     def atualizar(self, chave, valor):
         self.config[chave] = valor
         self._guardar()
-        print(f"[CONFIG PURPLE] '{chave}' atualizado para: {valor}")
+        print(f"[CONFIG PURPLE] '{chave}' set to: {valor}")
 
     def _guardar(self):
         with open(self.ficheiro, "w") as f:
             json.dump(self.config, f, indent=4)
 
     def imprimir(self):
-        print("\n[CONFIG PURPLE] Configuração atual:")
+        print("\n[CONFIG PURPLE] Current configuration:")
         for chave, valor in self.config.items():
             print(f" - {chave}: {valor}")
         print()

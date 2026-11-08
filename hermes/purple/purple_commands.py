@@ -16,64 +16,64 @@ class PurpleCommands:
 
         if comando == "pausar_eventos":
             self.config.atualizar("simulacao_eventos", False)
-            self.logger.escrever("COMANDO — eventos simulados pausados.")
-            return "Eventos simulados pausados."
+            self.logger.escrever("COMMAND — simulated events paused.")
+            return "Simulated events paused."
 
         elif comando == "retomar_eventos":
             self.config.atualizar("simulacao_eventos", True)
-            self.logger.escrever("COMANDO — eventos simulados retomados.")
-            return "Eventos simulados retomados."
+            self.logger.escrever("COMMAND — simulated events resumed.")
+            return "Simulated events resumed."
 
         elif comando == "set_heartbeat":
             try:
                 valor = int(valor)
                 self.config.atualizar("intervalo_heartbeat", valor)
-                self.logger.escrever(f"COMANDO — intervalo heartbeat atualizado para {valor}.")
-                return f"Heartbeat atualizado para {valor} ciclos."
+                self.logger.escrever(f"COMMAND — heartbeat interval set to {valor}.")
+                return f"Heartbeat interval set to {valor} cycles."
             except:
-                return "Valor inválido para heartbeat."
+                return "Invalid value for heartbeat."
 
         elif comando == "set_healthcheck":
             try:
                 valor = int(valor)
                 self.config.atualizar("intervalo_healthcheck", valor)
-                self.logger.escrever(f"COMANDO — intervalo healthcheck atualizado para {valor}.")
-                return f"Health-check atualizado para {valor} ciclos."
+                self.logger.escrever(f"COMMAND — health-check interval set to {valor}.")
+                return f"Health-check interval set to {valor} cycles."
             except:
-                return "Valor inválido para health-check."
+                return "Invalid value for health-check."
 
         elif comando == "set_metricas":
             try:
                 valor = int(valor)
                 self.config.atualizar("intervalo_metricas", valor)
-                self.logger.escrever(f"COMANDO — intervalo métricas atualizado para {valor}.")
-                return f"Métricas atualizadas para {valor} ciclos."
+                self.logger.escrever(f"COMMAND — metrics interval set to {valor}.")
+                return f"Metrics interval set to {valor} cycles."
             except:
-                return "Valor inválido para métricas."
+                return "Invalid value for metrics."
 
         elif comando == "forcar_healthcheck":
-            self.logger.escrever("COMANDO — health-check forçado manualmente.")
+            self.logger.escrever("COMMAND — health-check forced manually.")
             self.alerts.emitir_alerta(
                 severidade="INFO",
                 origem="comandos",
-                descricao="Health-check forçado manualmente."
+                descricao="Health-check forced manually."
             )
-            return "Health-check forçado."
+            return "Health-check forced."
 
         elif comando == "mostrar_config":
-            self.logger.escrever("COMANDO — mostrar configuração atual.")
+            self.logger.escrever("COMMAND — show current configuration.")
             self.config.imprimir()
-            return "Configuração mostrada na consola."
+            return "Configuration shown on the console."
 
         elif comando == "alerta_manual":
             self.alerts.emitir_alerta(
                 severidade="ALTO",
                 origem="comandos",
-                descricao="Alerta manual emitido.",
+                descricao="Manual alert emitted.",
                 contexto={"timestamp": time.time()}
             )
-            return "Alerta manual emitido."
+            return "Manual alert emitted."
 
         else:
-            return f"Comando desconhecido: {comando}"
+            return f"Unknown command: {comando}"
 

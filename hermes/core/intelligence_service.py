@@ -150,9 +150,9 @@ class IntelligenceService:
         a IA.
         """
         resultado = self.analyze(
-            "Resume em 2 a 3 frases os eventos recentes mais relevantes "
-            "e indica claramente se ha motivo de preocupacao ou se esta "
-            "tudo dentro do normal.",
+            "Summarize in 2 to 3 sentences the most relevant recent events "
+            "and state clearly whether there is cause for concern or whether everything "
+            "is within normal.",
             now=now,
         )
 
@@ -165,7 +165,7 @@ class IntelligenceService:
         # com isto no seu try/except existente, tal como qualquer outra
         # falha - nao escreve relatorio nenhum neste caso.
         if resultado.answer.startswith("[Hermes]"):
-            raise RuntimeError(f"Falha ao gerar relatorio (IA nao respondeu): {resultado.answer}")
+            raise RuntimeError(f"Failed to generate report (AI did not respond): {resultado.answer}")
 
         write_clean(
             source="hermes_ia",

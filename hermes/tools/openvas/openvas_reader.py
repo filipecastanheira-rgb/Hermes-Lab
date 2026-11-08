@@ -68,21 +68,21 @@ def _gmp(xml_command, timeout=60):
             cmd, cwd=GREENBONE_DIR, capture_output=True, text=True, timeout=timeout
         )
     except FileNotFoundError:
-        print("[OPENVAS_READER] 'docker-compose' nao encontrado.")
+        print("[OPENVAS_READER] 'docker-compose' not found.")
         return None, ""
     except subprocess.TimeoutExpired:
-        print("[OPENVAS_READER] Comando GMP excedeu o tempo limite: " + xml_command[:80])
+        print("[OPENVAS_READER] GMP command timed out: " + xml_command[:80])
         return None, ""
 
     if resultado.returncode != 0:
-        print("[OPENVAS_READER] Erro GMP: " + resultado.stderr[:300])
+        print("[OPENVAS_READER] GMP error: " + resultado.stderr[:300])
         return None, ""
 
     stdout = resultado.stdout.strip()
     try:
         raiz = ET.fromstring(stdout)
     except ET.ParseError:
-        print("[OPENVAS_READER] Nao foi possivel interpretar resposta GMP.")
+        print("[OPENVAS_READER] Could not parse GMP response.")
         return None, stdout
     return raiz, stdout
 
@@ -136,7 +136,7 @@ def _iniciar_e_esperar(task_id):
         time.sleep(INTERVALO_POLL_SEGUNDOS)
         esperado += INTERVALO_POLL_SEGUNDOS
 
-    print("[OPENVAS_READER] Scan nao terminou dentro do tempo limite (" + str(MAX_ESPERA_SEGUNDOS) + "s).")
+    print("[OPENVAS_READER] Scan did not finish within the time limit (" + str(MAX_ESPERA_SEGUNDOS) + "s).")
     return None
 
 
@@ -145,7 +145,7 @@ def _parse_report_xml(xml_texto):
     try:
         raiz = ET.fromstring(xml_texto)
     except ET.ParseError:
-        print("[OPENVAS_READER] Nao foi possivel interpretar o XML do relatorio.")
+        print("[OPENVAS_READER] Could not parse the report XML.")
         return []
 
     resultados_brutos = []
@@ -235,7 +235,7 @@ def parse_evento(dados_brutos):
             raw_ref=raw_ref,
         )
     except Exception as e:
-        print("[OPENVAS_READER] Aviso: falha ao escrever clean/: " + str(e))
+        print("[OPENVAS_READER] Warning: failed to write clean/: " + str(e))
 
     return evento
 
@@ -254,17 +254,17 @@ def ler_uma_vez(alvo):
 
     target_id = _obter_ou_criar_target(alvo)
     if not target_id:
-        print("[OPENVAS_READER] Falha ao obter/criar target.")
+        print("[OPENVAS_READER] Failed to get/create target.")
         return []
 
     task_id = _obter_ou_criar_task(target_id, alvo)
     if not task_id:
-        print("[OPENVAS_READER] Falha ao obter/criar task.")
+        print("[OPENVAS_READER] Failed to get/create task.")
         return []
 
     report_id = _iniciar_e_esperar(task_id)
     if not report_id:
-        print("[OPENVAS_READER] Scan nao produziu relatorio (timeout ou falha).")
+        print("[OPENVAS_READER] Scan produced no report (timeout or failure).")
         return []
 
     _, xml_bruto = _gmp("<get_reports report_id='" + report_id + "' format_id='" + REPORT_FORMAT_ID_XML + "' details='1' filter='apply_overrides=0 min_qod=0 rows=1000'/>")
@@ -275,7 +275,7 @@ def ler_uma_vez(alvo):
     try:
         raw_ref = write_raw("openvas", xml_bruto, extension="xml")
     except Exception as e:
-        print("[OPENVAS_READER] Aviso: falha ao escrever raw/: " + str(e))
+        print("[OPENVAS_READER] Warning: failed to write raw/: " + str(e))
 
     brutos = _parse_report_xml(xml_bruto)
     for b in brutos:
@@ -292,7 +292,7 @@ def vigiar(router, alvo, intervalo=3600):
     de vulnerabilidades e pesado em CPU - nao faz sentido correr de
     5 em 5 min no hardware constrangido do lab. Ctrl+C para parar.
     """
-    print("[OPENVAS_READER] A vigiar '" + alvo + "' a cada " + str(intervalo) + "s... (Ctrl+C para parar)")
+    print("[OPENVAS_READER] Watching '" + alvo + "' every " + str(intervalo) + "s... (Ctrl+C to stop)")
 
     while True:
         eventos = ler_uma_vez(alvo)

@@ -86,7 +86,7 @@ def parse_evento(linha, campos=None):
             raw_ref=raw_ref,
         )
     except Exception as e:
-        print(f"[ZEEK_READER] Aviso: falha ao escrever raw/clean: {e}")
+        print(f"[ZEEK_READER] Warning: failed to write raw/clean: {e}")
 
     return evento
 
@@ -94,7 +94,7 @@ def parse_evento(linha, campos=None):
 def ler_uma_vez(caminho=CONN_LOG_DEFAULT):
     eventos = []
     if not os.path.exists(caminho):
-        print(f"[ZEEK_READER] Ficheiro nao encontrado: {caminho}")
+        print(f"[ZEEK_READER] File not found: {caminho}")
         return eventos
 
     campos = _ler_campos(caminho)
@@ -110,11 +110,11 @@ def ler_uma_vez(caminho=CONN_LOG_DEFAULT):
 
 def vigiar(router, caminho=CONN_LOG_DEFAULT, intervalo=2):
     if not os.path.exists(caminho):
-        print(f"[ZEEK_READER] Ficheiro nao encontrado: {caminho}")
+        print(f"[ZEEK_READER] File not found: {caminho}")
         return
 
     campos = _ler_campos(caminho)
-    print(f"[ZEEK_READER] A vigiar {caminho}... (Ctrl+C para parar)")
+    print(f"[ZEEK_READER] Watching {caminho}... (Ctrl+C to stop)")
 
     with open(caminho, "r") as f:
         f.seek(0, os.SEEK_END)

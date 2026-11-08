@@ -72,7 +72,7 @@ def parse_evento(dados_brutos: dict) -> dict | None:
             raw_ref=raw_ref,
         )
     except Exception as e:
-        print(f"[TSHARK_READER] Aviso: falha ao escrever raw/clean: {e}")
+        print(f"[TSHARK_READER] Warning: failed to write raw/clean: {e}")
 
     return evento
 
@@ -93,13 +93,13 @@ def vigiar(router, interface: str = "lo", intervalo: int = 2, count: int = 10):
     Faz capturas sucessivas e envia os eventos para o pipeline do Hermes.
     """
     print(
-        f"[TSHARK_READER] A vigiar '{interface}' "
-        f"em lotes de {count} pacotes a cada {intervalo}s..."
+        f"[TSHARK_READER] Watching '{interface}' "
+        f"in batches of {count} packets every {intervalo}s..."
     )
     while True:
         eventos = ler_uma_vez(interface, count)
         for evento in eventos:
-            print(f"[TSHARK_READER] Evento: {evento}")
+            print(f"[TSHARK_READER] Event: {evento}")
             if router.correlator:
                 router.correlator.registar_evento(evento)
             elif router.alert_engine:

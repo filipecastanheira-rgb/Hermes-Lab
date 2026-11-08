@@ -51,20 +51,20 @@ def garantir_suricata(logger=None):
     ativo, _ = _correr(["sudo", "/usr/bin/systemctl", "is-active", "suricata"])
     if ativo:
         if logger:
-            logger.info("Suricata ja estava ativo.")
+            logger.info("Suricata was already active.")
         return True
     if logger:
-        logger.info("Suricata inativo - a tentar arrancar...")
+        logger.info("Suricata inactive - trying to start...")
     sucesso, saida = _correr(["sudo", "/usr/bin/systemctl", "start", "suricata"])
     if not sucesso:
         if logger:
-            logger.error(f"Falha ao arrancar Suricata: {saida}")
+            logger.error(f"Failed to start Suricata: {saida}")
         return False
     ativo, _ = _correr(["sudo", "/usr/bin/systemctl", "is-active", "suricata"])
     if ativo and logger:
-        logger.info("Suricata arrancado com sucesso.")
+        logger.info("Suricata started successfully.")
     elif not ativo and logger:
-        logger.error("Suricata nao ficou ativo apos o start.")
+        logger.error("Suricata did not become active after start.")
     return ativo
 
 
@@ -76,21 +76,21 @@ def garantir_zeek(logger=None):
     sucesso, saida = _correr(["sudo", "/opt/zeek/bin/zeekctl", "status"])
     if sucesso and "running" in saida:
         if logger:
-            logger.info("Zeek ja estava ativo.")
+            logger.info("Zeek was already active.")
         return True
     if logger:
-        logger.info("Zeek inativo - a tentar arrancar (zeekctl deploy)...")
+        logger.info("Zeek inactive - trying to start (zeekctl deploy)...")
     sucesso, saida = _correr(["sudo", "/opt/zeek/bin/zeekctl", "deploy"])
     if not sucesso:
         if logger:
-            logger.error(f"Falha ao arrancar Zeek: {saida}")
+            logger.error(f"Failed to start Zeek: {saida}")
         return False
     sucesso, saida = _correr(["sudo", "/opt/zeek/bin/zeekctl", "status"])
     ativo = sucesso and "running" in saida
     if ativo and logger:
-        logger.info("Zeek arrancado com sucesso.")
+        logger.info("Zeek started successfully.")
     elif not ativo and logger:
-        logger.error("Zeek nao ficou ativo apos o deploy.")
+        logger.error("Zeek did not become active after deploy.")
     return ativo
 
 
@@ -134,7 +134,7 @@ def garantir_openvas(logger=None):
     """
     if _openvas_gmp_responde():
         if logger:
-            logger.info("OpenVAS/Greenbone ja estava ativo e a responder.")
+            logger.info("OpenVAS/Greenbone was already active and responding.")
         return True
 
     sucesso = False
@@ -142,8 +142,8 @@ def garantir_openvas(logger=None):
     for tentativa in range(1, OPENVAS_UP_MAX_TENTATIVAS + 1):
         if logger:
             logger.info(
-                f"OpenVAS/Greenbone inativo - a correr docker-compose up -d "
-                f"(tentativa {tentativa}/{OPENVAS_UP_MAX_TENTATIVAS})..."
+                f"OpenVAS/Greenbone inactive - running docker-compose up -d "
+                f"(attempt {tentativa}/{OPENVAS_UP_MAX_TENTATIVAS})..."
             )
         sucesso, saida = _correr(
             ["docker-compose", "up", "-d"], cwd=GREENBONE_DIR, timeout=240
@@ -152,30 +152,30 @@ def garantir_openvas(logger=None):
             break
         if logger:
             logger.info(
-                f"docker-compose up -d falhou na tentativa {tentativa} "
-                f"(provavelmente scap-data ainda a preparar dados) - a repetir "
-                f"em {OPENVAS_UP_PAUSA_ENTRE_TENTATIVAS_SEGUNDOS}s..."
+                f"docker-compose up -d failed on attempt {tentativa} "
+                f"(probably scap-data is still preparing data) - retrying "
+                f"in {OPENVAS_UP_PAUSA_ENTRE_TENTATIVAS_SEGUNDOS}s..."
             )
         time.sleep(OPENVAS_UP_PAUSA_ENTRE_TENTATIVAS_SEGUNDOS)
 
     if not sucesso:
         if logger:
-            logger.error(f"Falha ao arrancar a stack Greenbone apos {OPENVAS_UP_MAX_TENTATIVAS} tentativas: {saida}")
+            logger.error(f"Failed to start the Greenbone stack after {OPENVAS_UP_MAX_TENTATIVAS} attempts: {saida}")
         return False
 
     esperado = 0
     while esperado < OPENVAS_MAX_ESPERA_SEGUNDOS:
         if _openvas_gmp_responde():
             if logger:
-                logger.info("OpenVAS/Greenbone arrancado com sucesso, GMP a responder.")
+                logger.info("OpenVAS/Greenbone started successfully, GMP responding.")
             return True
         time.sleep(OPENVAS_INTERVALO_POLL_SEGUNDOS)
         esperado += OPENVAS_INTERVALO_POLL_SEGUNDOS
 
     if logger:
         logger.error(
-            f"OpenVAS/Greenbone nao ficou pronto dentro do tempo limite "
-            f"({OPENVAS_MAX_ESPERA_SEGUNDOS}s) apos o up -d."
+            f"OpenVAS/Greenbone was not ready within the time limit "
+            f"({OPENVAS_MAX_ESPERA_SEGUNDOS}s) after up -d."
         )
     return False
 
@@ -196,6 +196,6 @@ def garantir_dependencias(logger=None):
             resultados[nome] = funcao(logger)
         except Exception as e:
             if logger:
-                logger.error(f"Erro inesperado ao garantir '{nome}': {e}")
+                logger.error(f"Unexpected error while ensuring '{nome}': {e}")
             resultados[nome] = False
     return resultados

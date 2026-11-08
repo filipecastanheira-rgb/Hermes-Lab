@@ -52,12 +52,12 @@ def comandos_tokens(argv):
 
     if acao == "criar":
         token_id, token = T.criar(store, argv[1] if len(argv) > 1 else "token")
-        print(f"Token {token_id} criado. Guarda-o: nao volta a ser mostrado.")
+        print(f"Token {token_id} created. Save it: it will not be shown again.")
         print(token)
     elif acao == "listar":
         print(T.formatar_lista(T.listar(store)))
     elif acao == "revogar" and len(argv) > 1:
-        print("Revogado." if T.revogar(store, argv[1]) else "Nao encontrado.")
+        print("Revoked." if T.revogar(store, argv[1]) else "Not found.")
     else:
         print(T.utilizacao())
     return 0
@@ -85,11 +85,11 @@ def main():
     # no momento em que e criado. Por isso so o mostramos quando acabou de
     # nascer (primeiro arranque) - depois disso, usa o que guardaste.
     if runner.auth.token_inicial:
-        print("[Hermes] Token criado agora (para outros dispositivos). Guarda-o: nao volta a ser mostrado.")
+        print("[Hermes] Token created now (for other devices). Save it: it will not be shown again.")
         print(f"[Hermes]   {runner.auth.token_inicial}")
     else:
         nomes = ", ".join(t["nome"] for t in runner.auth.listar()) or "(nenhum)"
-        print(f"[Hermes] Tokens configurados para clientes remotos: {nomes}")
+        print(f"[Hermes] Tokens configured for remote clients: {nomes}")
 
     abrir_dashboard(url)
 

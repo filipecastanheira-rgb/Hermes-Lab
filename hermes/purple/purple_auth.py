@@ -76,8 +76,8 @@ class PurpleAuth:
                 "id": secrets.token_hex(4),
                 "nome": "migrado",
                 "hash": hash_token(antigo),
-                "criado_em": "antes da migracao",
-                "nota": "token que ja existia; continua valido",
+                "criado_em": "before migration",
+                "nota": "token that already existed; remains valid",
             })
         self._guardar()
 
@@ -131,7 +131,7 @@ class PurpleAuth:
         return [{k: v for k, v in t.items() if k != "hash"} for t in self.dados["tokens"]]
 
     def mostrar(self):
-        print("\n[AUTH PURPLE] Tokens configurados (o valor so e conhecido por quem o guardou):")
+        print("\n[AUTH PURPLE] Configured tokens (the value is known only to whoever saved it):")
         for t in self.listar():
-            print(f" - {t['id']}  {t['nome']}  criado em {t['criado_em']}")
+            print(f" - {t['id']}  {t['nome']}  created at {t['criado_em']}")
         print()

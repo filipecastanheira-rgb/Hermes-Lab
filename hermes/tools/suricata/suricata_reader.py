@@ -106,7 +106,7 @@ def parse_evento(linha):
         )
     except Exception as e:
         # Nunca deixar a camada nova quebrar o pipeline BLUE existente.
-        print(f"[SURICATA_READER] Aviso: falha ao escrever raw/clean: {e}")
+        print(f"[SURICATA_READER] Warning: failed to write raw/clean: {e}")
 
     return evento
 
@@ -118,7 +118,7 @@ def ler_uma_vez(caminho=EVE_PATH_DEFAULT):
     """
     eventos = []
     if not os.path.exists(caminho):
-        print(f"[SURICATA_READER] Ficheiro não encontrado: {caminho}")
+        print(f"[SURICATA_READER] File not found: {caminho}")
         return eventos
 
     with open(caminho, "r") as f:
@@ -137,10 +137,10 @@ def vigiar(router, caminho=EVE_PATH_DEFAULT, intervalo=2):
     router BLUE já existente — igual ao que o scanner.py faz.
     """
     if not os.path.exists(caminho):
-        print(f"[SURICATA_READER] Ficheiro não encontrado: {caminho}")
+        print(f"[SURICATA_READER] File not found: {caminho}")
         return
 
-    print(f"[SURICATA_READER] A vigiar {caminho}... (Ctrl+C para parar)")
+    print(f"[SURICATA_READER] Watching {caminho}... (Ctrl+C to stop)")
 
     with open(caminho, "r") as f:
         f.seek(0, os.SEEK_END)  # só eventos novos a partir de agora

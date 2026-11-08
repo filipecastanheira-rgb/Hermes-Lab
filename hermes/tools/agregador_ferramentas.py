@@ -40,7 +40,7 @@ def vigiar_todas(router, alvos):
     for nome, modulo in FERRAMENTAS_REGISTADAS.items():
         if nome not in alvos:
             continue
-        print("[AGREGADOR] A vigiar '" + nome + "'...")
+        print("[AGREGADOR] Watching '" + nome + "'...")
         t = threading.Thread(
             target=modulo.vigiar, args=(router, alvos[nome]), daemon=True
         )

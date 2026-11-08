@@ -33,9 +33,9 @@ class TSharkTool:
         self.tshark_bin = shutil.which(tshark_bin)
 
         if not self.tshark_bin:
-            raise RuntimeError("TShark não encontrado no sistema.")
+            raise RuntimeError("TShark not found on the system.")
 
-        print(f"[TSHARK] Ferramenta disponível: {self.tshark_bin}")
+        print(f"[TSHARK] Tool available: {self.tshark_bin}")
 
     def capturar(self, interface="lo", count=10):
         """
@@ -71,14 +71,14 @@ class TSharkTool:
             )
         except subprocess.TimeoutExpired:
             raise RuntimeError(
-                f"TShark nao capturou {count} pacote(s) em 30s na interface "
-                f"'{interface}' - pode nao haver trafego suficiente nessa "
-                "interface neste momento."
+                f"TShark did not capture {count} packet(s) in 30s on interface "
+                f"'{interface}' - there may not be enough traffic on that "
+                "interface right now."
             )
 
         if resultado.returncode != 0:
             raise RuntimeError(
-                f"TShark terminou com erro: {resultado.stderr.strip()}"
+                f"TShark exited with error: {resultado.stderr.strip()}"
             )
 
         eventos = []
