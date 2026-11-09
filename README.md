@@ -111,6 +111,13 @@ Kept under `hermes/_archive/` for history. None of it is imported or run by the 
 
 This project is meant to run exclusively against an authorized lab environment — by default, `127.0.0.0/8`. It has never been used, and is not intended to be used, against third-party networks or systems without explicit authorization.
 
-## What's next (maybe)
+## What's next
 
-A "v2" of this project is a possibility, not a plan: offloading the reasoning/report-writing to a more capable model (self-hosted on a larger machine, or cloud-hosted) while keeping tool execution and the security boundary local, might make chained, situational investigation viable in a way the current hardware couldn't support. No timeline attached.
+The next phase is a governance, risk and compliance (GRC) exercise, kept in a separate repository (Hermes-GRC) that treats this project, at tag v1.0, as the asset in scope.
+
+- ISO/IEC 27001-aligned implementation, without certification
+- Risk assessment in the style of ISO/IEC 27005
+- First topic: ISMS scope and asset inventory
+- ISO/IEC 42001 (AI management systems) is left for a later phase
+
+Offloading the report-writing and reasoning to a more capable model, while keeping tool execution and the security boundary local, remains an open idea. It is not planned.
