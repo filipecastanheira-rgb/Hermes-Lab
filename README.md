@@ -113,11 +113,23 @@ This project is meant to run exclusively against an authorized lab environment â
 
 ## What's next
 
-The next phase is a governance, risk and compliance (GRC) exercise, kept in a separate repository (Hermes-GRC) that treats this project, at tag v1.0, as the asset in scope.
+Two phases follow v1.0. The v1.0 release stays frozen at its tag.
 
-- ISO/IEC 27001-aligned implementation, without certification
-- Risk assessment in the style of ISO/IEC 27005
-- First topic: ISMS scope and asset inventory
-- ISO/IEC 42001 (AI management systems) is left for a later phase
+### Cloud phase (in progress)
 
-Offloading the report-writing and reasoning to a more capable model, while keeping tool execution and the security boundary local, remains an open idea. It is not planned.
+Run the same local model (llama3.2:3b) in a container on an Oracle Cloud Always Free instance, to learn cloud deployment and compare it with the local setup.
+
+* Instance in the Germany Central (Frankfurt) region, within the Always Free limits
+* Reachable only through an encrypted WireGuard tunnel: no public SSH and no public model port
+* Host firewall and SSH hardened; rootless Podman container with the image pinned by digest, capabilities dropped and no-new-privileges
+* Pending: model download and speed measurement, automatic start at boot, and a written decision on what data the cloud model is allowed to read
+* A larger model may be tried later as a separate experiment
+
+### GRC phase (planned)
+
+A governance, risk and compliance (GRC) exercise, kept in a separate repository (Hermes-GRC) that treats this project, at tag v1.0, as the asset in scope.
+
+* ISO/IEC 27001-aligned implementation, without certification
+* Risk assessment in the style of ISO/IEC 27005
+* First topic: ISMS scope and asset inventory
+* ISO/IEC 42001 (AI management systems) is left for a later phase
