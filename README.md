@@ -124,6 +124,8 @@ Run the same local model (llama3.2:3b) in a container on an Oracle Cloud Always 
 * Host firewall and SSH hardened; rootless Podman container with the image pinned by digest, capabilities dropped and no-new-privileges
 * Pending: model download and speed measurement, automatic start at boot, and a written decision on what data the cloud model is allowed to read
 * A larger model may be tried later as a separate experiment
+* * Planned: remote access for three invited users, each with a separate WireGuard peer, least privilege and logging
+* Planned: access from a phone, including receiving reports there
 
 ### GRC phase (planned)
 
