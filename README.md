@@ -121,8 +121,11 @@ Run the same local model (llama3.2:3b) in a container on an Oracle Cloud Always 
 
 * Instance in the Germany Central (Frankfurt) region, within the Always Free limits
 * Reachable only through an encrypted WireGuard tunnel: no public SSH and no public model port
-* Host firewall and SSH hardened; rootless Podman container with the image pinned by digest, capabilities dropped and no-new-privileges
-* Pending: model download and speed measurement, automatic start at boot, and a written decision on what data the cloud model is allowed to read
+* Host firewall and SSH hardened
+* Rootless Podman container with the image pinned by digest; all Linux capabilities dropped and no-new-privileges set, both checked from inside the container
+* The container starts at boot as a systemd service; verified with a reboot test
+* Same model (llama3.2:3b) in the cloud and locally: about 7.4 tokens/s on the 2-core Arm instance and 8.4 tokens/s on the local 6-core desktop (CPU only), for one short prompt, two runs each; the Ollama versions differ, so this is an indication and not a benchmark
+* Data handling: results are sent to the cloud model unmasked. The tunnel protects the transport; the instance processes the text unencrypted. Masking is applied only to material chosen for publication. Not assessed: whether the instance logs request contents
 * A larger model may be tried later as a separate experiment
 * Planned: remote access for three invited users, each with a separate WireGuard peer, least privilege and logging
 * Planned: access from a phone, including receiving reports there
