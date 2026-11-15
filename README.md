@@ -132,7 +132,7 @@ Run the same local model (llama3.2:3b) in a container on an Oracle Cloud Always 
 
 ### GRC phase (planned)
 
-A governance, risk and compliance (GRC) exercise, kept in a separate repository (Hermes-GRC) that treats this project, at tag v1.0, as the asset in scope.
+A governance, risk and compliance (GRC) exercise, kept in a separate repository (Hermes-GRC). It is the last phase of the project, so that its scope covers the whole project at v2.0: the cloud instance and tunnel, the additional users and the phone access, as well as the local setup.
 
 * ISO/IEC 27001-aligned implementation, without certification
 * Risk assessment in the style of ISO/IEC 27005
