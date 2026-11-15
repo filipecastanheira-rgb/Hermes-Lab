@@ -1,4 +1,5 @@
 {
   "provider": "ollama",
-  "model": "llama3.2:3b"
+  "model": "llama3.2:3b",
+  "ollama_url": "http://localhost:11434"
 }

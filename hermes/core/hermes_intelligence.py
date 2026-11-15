@@ -4,13 +4,16 @@ Provider de IA do núcleo Hermes, unificado para viver dentro de
 ~/Hermes-Lab/ (não depende de /opt/hermes).
 
 Config: config/intelligence_config.json
-  {"provider": "none" | "openai" | "ollama", "model": "..."}
+  {"provider": "none" | "openai" | "ollama", "model": "...",
+   "ollama_url": "http://localhost:11434"}
+  "ollama_url" is optional; it defaults to http://localhost:11434.
 """
 
 import json
 import os
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "intelligence_config.json")
+DEFAULT_OLLAMA_URL = "http://localhost:11434"
 
 
 def _ler_config():
@@ -31,6 +34,7 @@ class HermesIntelligence:
         self.config = _ler_config()
         self.provider = self.config.get("provider", "none")
         self.model = self.config.get("model", "")
+        self.ollama_url = (self.config.get("ollama_url") or DEFAULT_OLLAMA_URL).rstrip("/")
         print(f"[IA] Provider selecionado: {self.provider} (modelo: {self.model or 'n/a'})")
 
     def gerar(self, prompt):
@@ -56,7 +60,7 @@ class HermesIntelligence:
             # "quente", levou ~40s sem problema. 200s da margem para o pior
             # caso (frio + prompt grande) sem arriscar timeouts falsos.
             r = requests.post(
-                "http://localhost:11434/api/generate",
+                f"{self.ollama_url}/api/generate",
                 json={"model": model, "prompt": prompt, "stream": False},
                 timeout=200,
             )
@@ -76,7 +80,7 @@ class HermesIntelligence:
         model = self.model or "llama3.2:3b"
         try:
             r = requests.post(
-                "http://localhost:11434/api/chat",
+                f"{self.ollama_url}/api/chat",
                 json={
                     "model": model,
                     "messages": [{"role": "user", "content": prompt}],
