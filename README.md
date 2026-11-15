@@ -111,6 +111,17 @@ Kept under `hermes/_archive/` for history. None of it is imported or run by the 
 
 This project is meant to run exclusively against an authorized lab environment — by default, `127.0.0.0/8`. It has never been used, and is not intended to be used, against third-party networks or systems without explicit authorization.
 
+## What changed from 1.0
+
+Version 1.0 is frozen at its tag. The second slice, developed in this branch, changes where and how Hermes is used, not what the tools do:
+
+- **The model runs in the cloud.** The report model (llama3.2:3b) runs in a container on an Oracle Cloud Always Free instance instead of on the local machine. The address is an optional setting in the local, Git-ignored configuration; when it is absent, Hermes uses the local model as in 1.0.
+- **Access only through an encrypted tunnel.** The instance has no public SSH and no public model port; everything goes through WireGuard.
+- **Data is not masked in use.** The operator and the invited users work with real data. Masking applies only to material chosen for publication on GitHub.
+- **Planned:** access for three invited users, each with a separate tunnel peer, and access from a phone.
+
+The lab boundary is unchanged: every tool call is still gated by `hermes/core/lab_boundary.py`. The reasoning behind each choice, and what has not been assessed, is in [`docs/DECISIONS.md`](docs/DECISIONS.md).
+
 ## What's next
 
 Two phases follow v1.0. The v1.0 release stays frozen at its tag. Work on the second slice happens in the `v2` branch and is closed with the tag `v2.0`; the reasoning behind the main choices is recorded in `docs/DECISIONS.md` on that branch.
