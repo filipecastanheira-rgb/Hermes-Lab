@@ -366,6 +366,7 @@ class PurpleAPI:
         @self._require_token
         def status():
             cache_key = "status"
+            from hermes.core.hermes_intelligence import obter_estado_ia
             resposta_cache = self.cache.obter(cache_key)
             if resposta_cache:
                 return self._responder("/status", resposta_cache)
@@ -375,6 +376,7 @@ class PurpleAPI:
                 "status": "Hermes PURPLE active",
                 "config": self.config.config,
                 "metricas": stats,
+                "ai": obter_estado_ia(),
             }
             self.cache.guardar(cache_key, resposta)
 
@@ -567,6 +569,7 @@ class PurpleAPI:
             # clara em vez de propagar excecao, mas mantem-se o try/except
             # aqui por seguranca extra.
             relatorio = ""
+            ai_source = None
             try:
                 from hermes.core.hermes_intelligence import HermesIntelligence
                 from hermes.core.intelligence_service import make_intelligence_service
@@ -578,6 +581,7 @@ class PurpleAPI:
                     context_config=ContextConfig(clean_dir=_Path("hermes/runtime/clean")),
                 )
                 relatorio = servico.escrever_relatorio_execucao(tool, target, eventos)
+                ai_source = getattr(servico, "last_ai_source", None)
             except Exception as e:
                 relatorio = f"The report for this run could not be generated: {e}"
 
@@ -589,6 +593,7 @@ class PurpleAPI:
                     "events_found": len(eventos),
                     "events": eventos,
                     "relatorio": relatorio,
+                    "ai_source": ai_source,
                 },
             )
 
