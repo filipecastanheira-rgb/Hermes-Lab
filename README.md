@@ -113,28 +113,12 @@ This project is meant to run exclusively against an authorized lab environment â
 
 ## What's next
 
-Two phases follow v1.0. The v1.0 release stays frozen at its tag.
+Two phases follow v1.0. The v1.0 release stays frozen at its tag. Work on the second slice happens in the `v2` branch and is closed with the tag `v2.0`; the reasoning behind the main choices is recorded in `docs/DECISIONS.md` on that branch.
 
 ### Cloud phase (in progress)
 
-Run the same local model (llama3.2:3b) in a container on an Oracle Cloud Always Free instance, to learn cloud deployment and compare it with the local setup.
-
-* Instance in the Germany Central (Frankfurt) region, within the Always Free limits
-* Reachable only through an encrypted WireGuard tunnel: no public SSH and no public model port
-* Host firewall and SSH hardened
-* Rootless Podman container with the image pinned by digest; all Linux capabilities dropped and no-new-privileges set, both checked from inside the container
-* The container starts at boot as a systemd service; verified with a reboot test
-* Same model (llama3.2:3b) in the cloud and locally: about 7.4 tokens/s on the 2-core Arm instance and 8.4 tokens/s on the local 6-core desktop (CPU only), for one short prompt, two runs each; the Ollama versions differ, so this is an indication and not a benchmark
-* Data handling: results are sent to the cloud model unmasked. The tunnel protects the transport; the instance processes the text unencrypted. Masking is applied only to material chosen for publication. Not assessed: whether the instance logs request contents
-* A larger model may be tried later as a separate experiment
-* Planned: remote access for three invited users, each with a separate WireGuard peer, least privilege and logging
-* Planned: access from a phone, including receiving reports there
+Run the same local model (llama3.2:3b) on an Oracle Cloud Always Free instance, reachable only through an encrypted WireGuard tunnel, to learn cloud deployment and compare it with the local setup. Planned: remote access for three invited users and access from a phone.
 
 ### GRC phase (planned)
 
-A governance, risk and compliance (GRC) exercise, kept in a separate repository (Hermes-GRC). It is the last phase of the project, so that its scope covers the whole project at v2.0: the cloud instance and tunnel, the additional users and the phone access, as well as the local setup.
-
-* ISO/IEC 27001-aligned implementation, without certification
-* Risk assessment in the style of ISO/IEC 27005
-* First topic: ISMS scope and asset inventory
-* ISO/IEC 42001 (AI management systems) is left for a later phase
+A governance, risk and compliance (GRC) exercise, kept in a separate repository (Hermes-GRC). It is the last phase of the project, so that it covers the whole project at v2.0: the cloud instance and tunnel, the additional users and the phone access, as well as the local setup. ISO/IEC 42001 (AI management systems) is left for a later phase.
