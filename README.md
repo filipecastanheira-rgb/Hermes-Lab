@@ -115,7 +115,8 @@ This project is meant to run exclusively against an authorized lab environment â
 
 Version 1.0 is frozen at its tag. The second slice, developed in this branch, changes where and how Hermes is used, not what the tools do:
 
-- **The model runs in the cloud.** The report model (llama3.2:3b) runs in a container on an Oracle Cloud Always Free instance instead of on the local machine. The address is an optional setting in the local, Git-ignored configuration; when it is absent, Hermes uses the local model as in 1.0.
+- **The model runs in the cloud.** The report model (llama3.2:3b) runs in a container on an Oracle Cloud Always Free instance instead of on the local machine. The address is an optional setting (`ollama_url`) in the local, Git-ignored configuration; when it is absent, Hermes uses the local model as in 1.0.
+- **Local fallback.** With the cloud address set, Hermes tries the cloud model first and falls back to the local one only if it cannot connect to the cloud (the local model must still be installed). A timeout while waiting for an answer, or an error returned by the cloud, does not trigger the fallback. The dashboard shows which model is in use and which one answered each run.
 - **Access only through an encrypted tunnel.** The instance has no public SSH and no public model port; everything goes through WireGuard.
 - **Data is not masked in use.** The operator and the invited users work with real data. Masking applies only to material chosen for publication on GitHub.
 - **Planned:** access for three invited users, each with a separate tunnel peer, and access from a phone.
