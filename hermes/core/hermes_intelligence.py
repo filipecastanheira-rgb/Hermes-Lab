@@ -110,9 +110,13 @@ class HermesIntelligence:
             try:
                 # Read timeout raised 30 -> 120 -> 200 s (2026-08-30): a cold
                 # Ollama plus a heavy execution-report prompt failed at 120 s.
-                # The 200 s read timeout is unchanged for the cloud instance
-                # (2 cores), not yet measured there. The connection timeout is
-                # separate and short, so an unreachable cloud fails fast.
+                # Unchanged for the cloud instance (2 cores). Measured there
+                # (2026-11-17): prompt reading about 20 tokens/s, output about
+                # 4 to 6 tokens/s, so a prompt of about 2400 tokens takes about
+                # 2 min to read. The events of a run go into the prompt whole, with
+                # no cap; OpenVAS, Suricata and Zeek runs were not measured with
+                # real data. The connection timeout is separate and short, so an
+                # unreachable cloud fails fast.
                 r = requests.post(
                     f"{url}/api/generate",
                     json={"model": model, "prompt": prompt, "stream": False},
