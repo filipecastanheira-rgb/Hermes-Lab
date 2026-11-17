@@ -71,3 +71,13 @@ Each entry records one decision: the context, what was decided, the alternatives
 **Alternatives considered.** None recorded. The scope followed from the order of the phases.
 
 **Consequences.** The ISMS scope and asset inventory already drafted for v1.0 are kept as the "before" snapshot and will be extended to the new assets when the GRC phase starts.
+
+## 8. Cloud-first AI with local fallback and an indicator (2026-11-15)
+
+**Context.** Hermes can reach the cloud model through the tunnel (entry 6), but with the tunnel or the instance down, report generation had no other route. The operator also could not tell which model wrote a report, and the cloud model processes data outside the local machine (entry 5).
+
+**Decision.** Hermes tries the cloud model first and falls back to the local model only when the connection to the cloud fails. The fallback exists only when `ollama_url` is set; without it, behaviour is that of v1.0. The connection timeout is 5 s, separate from the 200 s read timeout, and a read timeout or an HTTP error from the cloud does not trigger the fallback. The text generation function still returns a string; the model that answered is kept in a separate `ai_source` field ("Cloud AI" or "Local AI"), which is returned by `/run_tool` and written into the report event. The dashboard shows an indicator with the current AI state (cloud, local or none), kept in its own cache of about 30 s, and a label under the report card showing which model answered that run.
+
+**Alternatives considered.** Putting the label in the report text. Rejected in favour of the separate field and the indicator. Other alternatives: not recorded.
+
+**Consequences.** With the cloud down, every request pays the 5 s connection timeout before the local model is used; one test took 17.6 s, consistent with that timeout plus local generation. The tool-calling path (`gerar_com_tools()`) and `definir_provider()` are unchanged and have no fallback. Tested: cloud, local and no-AI states in Python, and the indicator and label with the cloud up and down in the browser. Not tested: the "none" state and the empty label in the browser, the `ai` field in `/status`, dashboard latency with the cloud down (about 5 s expected when the state refreshes), a connection cut mid-read, and a read timeout without fallback. The 200 s and 30 s timeouts have not been measured against the cloud instance.
