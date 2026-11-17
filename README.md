@@ -55,7 +55,7 @@ HERMES (hermes_cli.py → PurpleRunner)
    │
    ├── BLUE    — background detection: Suricata + Zeek, always running once started
    ├── PURPLE  — always-on service: HTTP API, token auth, rate limiting, dashboard
-   ├── IA      — Ollama (local), used only to write per-execution reports, not to decide actions
+   ├── IA      — Ollama (cloud first, local fallback), used only to write per-execution reports, not to decide actions
    └── TOOLS   — shared capabilities, dispatched manually by the operator:
         ├── Nmap        (target: IP)
         ├── OpenVAS     (target: IP)
