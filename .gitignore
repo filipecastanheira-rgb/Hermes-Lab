@@ -22,3 +22,4 @@ runtime/
 *.log
 secrets/*
 !secrets/credentials.example.json
+config/guest_config.json

@@ -48,6 +48,7 @@ from hermes.purple.purple_webhooks import PurpleWebhooks
 from hermes.purple.purple_dashboard import PurpleDashboard
 from hermes.purple.purple_health import PurpleHealthCheck
 from hermes.purple.purple_watchdog import PurpleWatchdog
+from hermes.purple.guest_view import arrancar_se_configurado
 
 from hermes.utils.metrics import Metrics
 from hermes.core.event_store import apply_retention
@@ -119,6 +120,10 @@ class PurpleRunner:
 
         self._api_thread.start()
         self.logger.info("PURPLE API started in a separate thread.")
+        try:
+            arrancar_se_configurado(self.dashboard, self.logger)
+        except Exception as e:
+            self.logger.error(f"Guest view failed to start: {e}")
         # Arranca a vigilancia continua das ferramentas de fundo
         # (Suricata, Zeek) - Fase 0 raw/clean, nunca deve impedir o
         # PURPLE de arrancar se falhar. Isto e passivo (escuta trafego
