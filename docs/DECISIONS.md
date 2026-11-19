@@ -4,7 +4,7 @@ Each entry records one decision: the context, what was decided, the alternatives
 
 ## 1. Repository layout for the second slice (2026-11-14)
 
-**Context.** Version 1.0 is closed as a development slice and is tagged. The second slice changes the project substantially: the model moves to a cloud instance, three more users are planned, and phone access is added.
+**Context.** Version 1.0 is closed as a development slice and is tagged. The second slice changes the project substantially: the model moves to a cloud instance and three more users are planned.
 
 **Decision.** The second slice stays in this repository, developed in a branch named `v2` and closed with the tag `v2.0`. The tag `v1.0` is left untouched.
 
@@ -64,7 +64,7 @@ Each entry records one decision: the context, what was decided, the alternatives
 
 ## 7. GRC becomes the last phase (2026-11-14)
 
-**Context.** The GRC phase was originally planned as the second phase, when only the first existed, so the project at v1.0 was the only possible scope. The second slice then adds a cloud instance, a tunnel, further users and a new access route from a phone.
+**Context.** The GRC phase was originally planned as the second phase, when only the first existed, so the project at v1.0 was the only possible scope. The second slice then adds a cloud instance, a tunnel and further users.
 
 **Decision.** GRC moves to the last phase, so that it covers the whole project at v2.0.
 
