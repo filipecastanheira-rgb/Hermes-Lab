@@ -7,7 +7,7 @@ and what is (and isn't) covered by automated tests.
 
 The PURPLE API accepts two credentials: an HttpOnly session cookie, minted for the
 local operator at startup, or a token sent in the `X-Hermes-Token` request header
-(phone, other machines, scripts). `config/purple_auth.json` stores **only their SHA-256 hashes**
+(other machines, scripts). `config/purple_auth.json` stores **only their SHA-256 hashes**
 (format 2): the clear token exists at the moment it is created and is shown
 once. A file read by mistake — a backup, a copy shared for debugging, a synced
 folder — no longer grants access.
@@ -81,7 +81,7 @@ out. None of that is a security control; it is friction.
   addresses.
 - Sessions live in the server's memory: restarting Hermes invalidates them, and
   the CLI opens a fresh nonce on every start. `POST /auth/logout` revokes one.
-- Tokens (tema 5) are unchanged and remain the way in for the phone, for other
+- Tokens (tema 5) are unchanged and remain the way in for other
   machines, and for the friends who will be given access.
 
 The private window is still how Hermes opens the dashboard, and for a

@@ -79,7 +79,7 @@ cp config/intelligence_config.example.json config/intelligence_config.json
 python3 hermes_cli.py
 ```
 
-This starts the PURPLE service (API, background monitoring, dashboard) and opens the dashboard in your default browser, already signed in: the CLI generates a single-use nonce and puts it in the URL fragment, which the page trades for an `HttpOnly` session cookie. Nothing to paste, nothing to store, and nothing in the URL that reaches the server. Tokens exist for clients that are not this machine — the phone, another host, a script — and are sent in the `X-Hermes-Token` header. Run the tests with `pytest tests/`.
+This starts the PURPLE service (API, background monitoring, dashboard) and opens the dashboard in your default browser, already signed in: the CLI generates a single-use nonce and puts it in the URL fragment, which the page trades for an `HttpOnly` session cookie. Nothing to paste, nothing to store, and nothing in the URL that reaches the server. Tokens exist for clients that are not this machine — another host, a script — and are sent in the `X-Hermes-Token` header. Run the tests with `pytest tests/`.
 
 **Why a private window:** Hermes opens the dashboard with `firefox --private-window`.
 This is a functional requirement, not a security one. Requests from the dashboard to the
@@ -117,8 +117,8 @@ Two phases follow v1.0. The v1.0 release stays frozen at its tag. Work on the se
 
 ### Cloud phase (in progress)
 
-Run the same local model (llama3.2:3b) on an Oracle Cloud Always Free instance, reachable only through an encrypted WireGuard tunnel, to learn cloud deployment and compare it with the local setup. Planned: remote access for three invited users and access from a phone.
+Run the same local model (llama3.2:3b) on an Oracle Cloud Always Free instance, reachable only through an encrypted WireGuard tunnel, to learn cloud deployment and compare it with the local setup. Planned: remote access for three invited users.
 
 ### GRC phase (planned)
 
-A governance, risk and compliance (GRC) exercise, kept in a separate repository (Hermes-GRC). It is the last phase of the project, so that it covers the whole project at v2.0: the cloud instance and tunnel, the additional users and the phone access, as well as the local setup. ISO/IEC 42001 (AI management systems) is left for a later phase.
+A governance, risk and compliance (GRC) exercise, kept in a separate repository (Hermes-GRC). It is the last phase of the project, so that it covers the whole project at v2.0: the cloud instance and tunnel, the additional users and the local setup. ISO/IEC 42001 (AI management systems) is left for a later phase.
