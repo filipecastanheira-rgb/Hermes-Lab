@@ -117,7 +117,7 @@ Two phases follow v1.0. The v1.0 release stays frozen at its tag. Work on the se
 
 ### Cloud phase (in progress)
 
-Run the same local model (llama3.2:3b) on an Oracle Cloud Always Free instance, reachable only through an encrypted WireGuard tunnel, to learn cloud deployment and compare it with the local setup. Planned: remote access for three invited users.
+Run the same local model (llama3.2:3b) on an Oracle Cloud Always Free instance, reachable only through an encrypted WireGuard tunnel, to learn cloud deployment and compare it with the local setup. Planned: remote access for two invited users.
 
 ### GRC phase (planned)
 
