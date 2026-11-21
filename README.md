@@ -119,7 +119,7 @@ Version 1.0 is frozen at its tag. The second slice, developed in this branch, ch
 - **Local fallback.** With the cloud address set, Hermes tries the cloud model first and falls back to the local one only if it cannot connect to the cloud (the local model must still be installed). A timeout while waiting for an answer, or an error returned by the cloud, does not trigger the fallback. The dashboard shows which model is in use and which one answered each run.
 - **Access only through an encrypted tunnel.** The instance has no public SSH and no public model port; everything goes through WireGuard.
 - **Data is not masked in use.** The operator and the invited users work with real data. Masking applies only to material chosen for publication on GitHub.
-- **Read-only access for invited users.** Each invited user connects through a separate WireGuard peer and sees only the dashboard page, served by a separate read-only server (`hermes/purple/guest_view.py`) through a proxy on the cloud instance. They cannot run tools, and the main API stays on loopback. Tested end to end with one invited user so far.
+- **Read-only access for invited users.** Each invited user connects through a separate WireGuard peer and sees only the dashboard page, served by a separate read-only server (`hermes/purple/guest_view.py`) through a proxy on the cloud instance. They cannot run tools, and the main API stays on loopback. Tested end to end with both invited users.
 
 The lab boundary is unchanged: every tool call is still gated by `hermes/core/lab_boundary.py`. The reasoning behind each choice, and what has not been assessed, is in [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
@@ -129,7 +129,7 @@ Two phases follow v1.0. The v1.0 release stays frozen at its tag. Work on the se
 
 ### Cloud phase (in progress)
 
-Run the same local model (llama3.2:3b) on an Oracle Cloud Always Free instance, reachable only through an encrypted WireGuard tunnel, to learn cloud deployment and compare it with the local setup. Remote access for three invited users, read-only, through a proxy on the instance; tested with one user so far.
+Run the same local model (llama3.2:3b) on an Oracle Cloud Always Free instance, reachable only through an encrypted WireGuard tunnel, to learn cloud deployment and compare it with the local setup. Remote access for two invited users, read-only, through a proxy on the instance; tested with both.
 
 ### GRC phase (planned)
 

@@ -4,7 +4,7 @@ Each entry records one decision: the context, what was decided, the alternatives
 
 ## 1. Repository layout for the second slice (2026-11-14)
 
-**Context.** Version 1.0 is closed as a development slice and is tagged. The second slice changes the project substantially: the model moves to a cloud instance and three more users are planned.
+**Context.** Version 1.0 is closed as a development slice and is tagged. The second slice changes the project substantially: the model moves to a cloud instance and two more users are planned.
 
 **Decision.** The second slice stays in this repository, developed in a branch named `v2` and closed with the tag `v2.0`. The tag `v1.0` is left untouched.
 
@@ -44,7 +44,7 @@ Each entry records one decision: the context, what was decided, the alternatives
 
 ## 5. Data handling for the cloud model (2026-11-14)
 
-**Context.** The operator, and later three invited users, work with Hermes output (for example network captures and reports) that contains addresses and other identifying data. Masked output would be useless for analysis.
+**Context.** The operator, and later two invited users, work with Hermes output (for example network captures and reports) that contains addresses and other identifying data. Masked output would be useless for analysis.
 
 **Decision.** Data is not masked in use: the operator and the invited users receive Hermes output with real data, and data may be sent unmasked to the cloud model. Masking applies only to material chosen for publication on GitHub, case by case, before it is published. It is not a standing transformation of the data, and nothing produced by running the tools is committed by default.
 
@@ -90,4 +90,4 @@ Each entry records one decision: the context, what was decided, the alternatives
 
 **Alternatives considered.** Forwarding guest traffic through the instance to the machine: rejected, because a mistake in the forwarding rules would open a direct path to it. Adding a guest role to the existing API: rejected, to leave that API untouched on loopback. Putting a firewall in front of the machine was considered and left for a later phase.
 
-**Consequences.** If the instance is down, invited users cannot connect, while Hermes itself keeps working with the local fallback (entry 8); if the machine is off or Hermes is not running, the proxy returns 502. Tested with one invited user: the handshake, the dashboard loading and refreshing, a POST rejected with 403, no response from the model port, SSH to the instance refused, and no reply from the machine's tunnel address. The machine-side rule was checked with the tunnel taken down and up again, and a reboot of the instance brought back the tunnel, the proxy, the firewall rules and the model container on their own. Not tested: the other invited users' peers, and whether new alerts appear in a guest's alert table. Not assessed: the guest server runs on Flask's development server; invited users see real alerts, including open ports of the lab machine; the proxy logs the source address and path of each request, and retention and access to those logs have not been reviewed.
+**Consequences.** If the instance is down, invited users cannot connect, while Hermes itself keeps working with the local fallback (entry 8); if the machine is off or Hermes is not running, the proxy returns 502. Tested with both invited users: the handshake, the dashboard loading and refreshing, a POST rejected with 403, no response from the model port, SSH to the instance refused, and no reply from the machine's tunnel address. For one guest the last test was repeated with the allowed addresses widened to the whole tunnel network and routes added to the machine and to the other guest: both pings stayed unanswered and without an ICMP error, which fits a silently dropped packet but does not show which layer dropped it (the instance does not forward packets, and the machine's WireGuard accepts only the instance's address as a source). The machine-side rule was checked with the tunnel taken down and up again, and a reboot of the instance brought back the tunnel, the proxy, the firewall rules and the model container on their own. New alerts do reach the guest's alert table, which shows the time but not the date. Not assessed: an invited user probing the ports of the instance raised no alert, because the instance firewall rejects without logging and Hermes sees only the machine's own traffic; the guest server runs on Flask's development server; invited users see real alerts, including open ports of the lab machine; the proxy logs the source address and path of each request, and retention and access to those logs have not been reviewed.
