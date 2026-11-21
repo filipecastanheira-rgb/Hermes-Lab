@@ -113,7 +113,7 @@ This project is meant to run exclusively against an authorized lab environment â
 
 ## What changed from 1.0
 
-Version 1.0 is frozen at its tag. The second slice, developed in this branch, changes where and how Hermes is used, not what the tools do:
+Version 1.0 is frozen at its tag. The second slice, released as v2.0, changes where and how Hermes is used, not what the tools do:
 
 - **The model runs in the cloud.** The report model (llama3.2:3b) runs in a container on an Oracle Cloud Always Free instance instead of on the local machine. The address is an optional setting (`ollama_url`) in the local, Git-ignored configuration; when it is absent, Hermes uses the local model as in 1.0.
 - **Local fallback.** With the cloud address set, Hermes tries the cloud model first and falls back to the local one only if it cannot connect to the cloud (the local model must still be installed). A timeout while waiting for an answer, or an error returned by the cloud, does not trigger the fallback. The dashboard shows which model is in use and which one answered each run.
@@ -125,11 +125,11 @@ The lab boundary is unchanged: every tool call is still gated by `hermes/core/la
 
 ## What's next
 
-Two phases follow v1.0. The v1.0 release stays frozen at its tag. Work on the second slice happens in the `v2` branch and is closed with the tag `v2.0`; the reasoning behind the main choices is recorded in `docs/DECISIONS.md` on that branch.
+Two phases follow v1.0. The v1.0 release stays frozen at its tag. The first, the cloud phase, closes with the tag `v2.0`; the reasoning behind the main choices is recorded in `docs/DECISIONS.md`.
 
-### Cloud phase (in progress)
+### Cloud phase (done, v2.0)
 
-Run the same local model (llama3.2:3b) on an Oracle Cloud Always Free instance, reachable only through an encrypted WireGuard tunnel, to learn cloud deployment and compare it with the local setup. Remote access for two invited users, read-only, through a proxy on the instance; tested with both.
+The same local model (llama3.2:3b) runs on an Oracle Cloud Always Free instance, reachable only through an encrypted WireGuard tunnel, to learn cloud deployment and compare it with the local setup. Two invited users have read-only access through a proxy on the instance, tested with both.
 
 ### GRC phase (planned)
 
