@@ -176,6 +176,7 @@ class IntelligenceService:
                 "texto": resultado.answer,
                 "motivo": motivo,
                 "event_count": resultado.event_count,
+                "ai_source": getattr(self.intelligence, "last_source", None),
             },
         )
         return resultado.answer
@@ -220,8 +221,10 @@ class IntelligenceService:
 
         prompt = self._prompt(pergunta, "")
         answer = self.intelligence.gerar(prompt)
+        self.last_ai_source = getattr(self.intelligence, "last_source", None)
 
         if str(answer).startswith("[Hermes]"):
+            self.last_ai_source = None
             return (
                 "The automatic report for this run could not be generated "
                 f"(AI failure: {answer}). The raw events remain available "

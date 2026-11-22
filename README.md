@@ -55,7 +55,7 @@ HERMES (hermes_cli.py → PurpleRunner)
    │
    ├── BLUE    — background detection: Suricata + Zeek, always running once started
    ├── PURPLE  — always-on service: HTTP API, token auth, rate limiting, dashboard
-   ├── IA      — Ollama (local), used only to write per-execution reports, not to decide actions
+   ├── IA      — Ollama (cloud first, local fallback), used only to write per-execution reports, not to decide actions
    └── TOOLS   — shared capabilities, dispatched manually by the operator:
         ├── Nmap        (target: IP)
         ├── OpenVAS     (target: IP)
@@ -111,13 +111,25 @@ Kept under `hermes/_archive/` for history. None of it is imported or run by the 
 
 This project is meant to run exclusively against an authorized lab environment — by default, `127.0.0.0/8`. It has never been used, and is not intended to be used, against third-party networks or systems without explicit authorization.
 
+## What changed from 1.0
+
+Version 1.0 is frozen at its tag. The second slice, released as v2.0, changes where and how Hermes is used, not what the tools do:
+
+- **The model runs in the cloud.** The report model (llama3.2:3b) runs in a container on an Oracle Cloud Always Free instance instead of on the local machine. The address is an optional setting (`ollama_url`) in the local, Git-ignored configuration; when it is absent, Hermes uses the local model as in 1.0.
+- **Local fallback.** With the cloud address set, Hermes tries the cloud model first and falls back to the local one only if it cannot connect to the cloud (the local model must still be installed). A timeout while waiting for an answer, or an error returned by the cloud, does not trigger the fallback. The dashboard shows which model is in use and which one answered each run.
+- **Access only through an encrypted tunnel.** The instance has no public SSH and no public model port; everything goes through WireGuard.
+- **Data is not masked in use.** The operator and the invited users work with real data. Masking applies only to material chosen for publication on GitHub.
+- **Read-only access for invited users.** Each invited user connects through a separate WireGuard peer and sees only the dashboard page, served by a separate read-only server (`hermes/purple/guest_view.py`) through a proxy on the cloud instance. They cannot run tools, and the main API stays on loopback. Tested end to end with both invited users.
+
+The lab boundary is unchanged: every tool call is still gated by `hermes/core/lab_boundary.py`. The reasoning behind each choice, and what has not been assessed, is in [`docs/DECISIONS.md`](docs/DECISIONS.md).
+
 ## What's next
 
-Two phases follow v1.0. The v1.0 release stays frozen at its tag. Work on the second slice happens in the `v2` branch and is closed with the tag `v2.0`; the reasoning behind the main choices is recorded in `docs/DECISIONS.md` on that branch.
+Two phases follow v1.0. The v1.0 release stays frozen at its tag. The first, the cloud phase, closes with the tag `v2.0`; the reasoning behind the main choices is recorded in `docs/DECISIONS.md`.
 
-### Cloud phase (in progress)
+### Cloud phase (done, v2.0)
 
-Run the same local model (llama3.2:3b) on an Oracle Cloud Always Free instance, reachable only through an encrypted WireGuard tunnel, to learn cloud deployment and compare it with the local setup. Planned: remote access for two invited users.
+The same local model (llama3.2:3b) runs on an Oracle Cloud Always Free instance, reachable only through an encrypted WireGuard tunnel, to learn cloud deployment and compare it with the local setup. Two invited users have read-only access through a proxy on the instance, tested with both.
 
 ### GRC phase (planned)
 

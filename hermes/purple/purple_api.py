@@ -366,6 +366,7 @@ class PurpleAPI:
         @self._require_token
         def status():
             cache_key = "status"
+            from hermes.core.hermes_intelligence import obter_estado_ia
             resposta_cache = self.cache.obter(cache_key)
             if resposta_cache:
                 return self._responder("/status", resposta_cache)
@@ -375,6 +376,7 @@ class PurpleAPI:
                 "status": "Hermes PURPLE active",
                 "config": self.config.config,
                 "metricas": stats,
+                "ai": obter_estado_ia(),
             }
             self.cache.guardar(cache_key, resposta)
 
@@ -475,7 +477,9 @@ class PurpleAPI:
             if self.dashboard is None:
                 return jsonify({"erro": "Dashboard is not configured."}), 501
 
+            from hermes.core.hermes_intelligence import obter_estado_ia
             dados = self.dashboard.gerar_dashboard()
+            dados["ai"] = obter_estado_ia()
             return self._responder("/dashboard", dados)
 
         @self.app.route("/dashboard/view", methods=["GET"])
@@ -567,6 +571,7 @@ class PurpleAPI:
             # clara em vez de propagar excecao, mas mantem-se o try/except
             # aqui por seguranca extra.
             relatorio = ""
+            ai_source = None
             try:
                 from hermes.core.hermes_intelligence import HermesIntelligence
                 from hermes.core.intelligence_service import make_intelligence_service
@@ -578,6 +583,7 @@ class PurpleAPI:
                     context_config=ContextConfig(clean_dir=_Path("hermes/runtime/clean")),
                 )
                 relatorio = servico.escrever_relatorio_execucao(tool, target, eventos)
+                ai_source = getattr(servico, "last_ai_source", None)
             except Exception as e:
                 relatorio = f"The report for this run could not be generated: {e}"
 
@@ -589,6 +595,7 @@ class PurpleAPI:
                     "events_found": len(eventos),
                     "events": eventos,
                     "relatorio": relatorio,
+                    "ai_source": ai_source,
                 },
             )
 
@@ -659,10 +666,12 @@ _DASHBOARD_HTML = """
   <span id="resultado-correr" style="font-size:0.85rem;"></span>
 </div>
 
+<div id="indicador-ia" style="font-size:0.85rem; color:#8b949e; margin-bottom:8px;">AI: not checked yet</div>
 <h2 style="color:#8b949e; font-size:0.9rem;">Last run report</h2>
 <div class="card" id="relatorio-execucao" style="margin-bottom:24px; line-height:1.5; white-space:pre-wrap;">
   <div class="vazio">Run a tool above to see the report here.</div>
 </div>
+<div id="rotulo-ia" style="font-size:0.8rem; color:#8b949e; margin:-16px 0 24px 0;"></div>
 
 <h2 style="color:#8b949e; font-size:0.9rem;">Events by source</h2>
 <div class="grid" id="origens" style="margin-bottom:24px;"></div>
@@ -831,6 +840,8 @@ async function atualizar() {
       );
     }
 
+    const estadosIA = {cloud: "AI: Cloud AI", local: "AI: Local AI", none: "AI: none available", unknown: "AI: not checked yet"};
+    $("indicador-ia").textContent = estadosIA[d.ai] || "AI: not checked yet";
     $("ultima-atualizacao").textContent = "last update: " + new Date().toLocaleTimeString();
     return true;
   } catch (e) {
@@ -866,6 +877,7 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
   resultadoEl.textContent = "Running... (can take up to 2 min, especially for openvas)";
   resultadoEl.style.color = "#8b949e";
   relatorioEl.textContent = "generating report...";
+  document.getElementById("rotulo-ia").textContent = "";
 
   try {
     const r = await pedir("/run_tool", {
@@ -883,6 +895,7 @@ document.getElementById("btn-correr").addEventListener("click", async () => {
       resultadoEl.textContent = d.events_found + " event(s) found.";
       resultadoEl.style.color = "#7ee787";
       relatorioEl.textContent = d.relatorio || "(no report)";
+      document.getElementById("rotulo-ia").textContent = d.ai_source ? "Answered by: " + d.ai_source : "No AI answered this report.";
       atualizar();
     }
   } catch (e) {
