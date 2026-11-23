@@ -206,6 +206,19 @@ class PurpleAPI:
                 return Response("Host not allowed", status=400, mimetype="text/plain")
             return None
 
+        @self.app.before_request
+        def _validar_forma_do_corpo():
+            """Refuse JSON bodies that are not an object (for example a list).
+
+            The routes read fields with dados.get(...); a body that is not an
+            object made them fail with a 500 instead of a clean refusal.
+            """
+            if request.method == "POST":
+                corpo = request.get_json(silent=True)
+                if corpo is not None and not isinstance(corpo, dict):
+                    return jsonify({"erro": "JSON body must be an object."}), 400
+            return None
+
         self._definir_rotas()
 
     def _recusar_token_na_url(self, endpoint):
@@ -390,6 +403,8 @@ class PurpleAPI:
         def comando():
             dados = request.json or {}
             cmd = dados.get("comando")
+            if not isinstance(cmd, str) or not cmd.strip():
+                return jsonify({"erro": "Missing or invalid 'comando'."}), 400
             valor = dados.get("valor")
 
             resultado = self.commands.executar(cmd, valor)
@@ -425,7 +440,7 @@ class PurpleAPI:
             chave = dados.get("chave")
             valor = dados.get("valor")
 
-            if chave not in self.config.config:
+            if not isinstance(chave, str) or chave not in self.config.config:
                 self.api_logger.log_acesso_negado("/config", "Invalid key")
                 return jsonify({"erro": "Invalid configuration key"}), 400
 
@@ -515,11 +530,14 @@ class PurpleAPI:
             never silently ignored.
             """
             dados = request.json or {}
-            tool = dados.get("tool", "").strip()
-            target = dados.get("target", "").strip()
+            tool = dados.get("tool")
+            target = dados.get("target")
 
-            if not tool or not target:
+            if (not isinstance(tool, str) or not isinstance(target, str)
+                    or not tool.strip() or not target.strip()):
                 return jsonify({"error": "Both 'tool' and 'target' are required."}), 400
+            tool = tool.strip()
+            target = target.strip()
 
             # lab_boundary so faz sentido para tools cujo "alvo" e um IP/rede
             # real (nmap, openvas) - o seu objetivo e impedir scans fora do
