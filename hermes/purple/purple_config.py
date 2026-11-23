@@ -2,6 +2,12 @@ import json
 import os
 import time
 
+INTERVALO_MIN = 1
+INTERVALO_MAX = 3600
+CHAVES_INTERVALO = ("intervalo_heartbeat", "intervalo_healthcheck", "intervalo_metricas")
+NIVEIS_ALERTA = ("INFO", "ERROR")
+
+
 class PurpleConfig:
     """
     Sistema de configuração dinâmica para o camada PURPLE.
@@ -37,7 +43,23 @@ class PurpleConfig:
     def obter(self, chave):
         return self.config.get(chave)
 
+    @staticmethod
+    def _validar(chave, valor):
+        """Raise ValueError if the value cannot be used by the runtime."""
+        if chave in CHAVES_INTERVALO:
+            if isinstance(valor, bool) or not isinstance(valor, int) \
+                    or not INTERVALO_MIN <= valor <= INTERVALO_MAX:
+                raise ValueError(
+                    f"{chave} must be an integer between {INTERVALO_MIN} and {INTERVALO_MAX}")
+        elif chave == "simulacao_eventos":
+            if not isinstance(valor, bool):
+                raise ValueError("simulacao_eventos must be true or false")
+        elif chave == "nivel_alerta_minimo":
+            if valor not in NIVEIS_ALERTA:
+                raise ValueError(f"nivel_alerta_minimo must be one of {', '.join(NIVEIS_ALERTA)}")
+
     def atualizar(self, chave, valor):
+        self._validar(chave, valor)
         self.config[chave] = valor
         self._guardar()
         print(f"[CONFIG PURPLE] '{chave}' set to: {valor}")

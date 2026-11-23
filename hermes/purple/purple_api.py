@@ -429,7 +429,11 @@ class PurpleAPI:
                 self.api_logger.log_acesso_negado("/config", "Invalid key")
                 return jsonify({"erro": "Invalid configuration key"}), 400
 
-            self.config.atualizar(chave, valor)
+            try:
+                self.config.atualizar(chave, valor)
+            except ValueError as e:
+                self.api_logger.log_acesso_negado("/config", "Invalid value")
+                return jsonify({"erro": str(e)}), 400
             resposta = {"resultado": f"Configuration '{chave}' set to {valor}"}
             self.cache.guardar("config", resposta)
 
