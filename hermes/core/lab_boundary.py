@@ -21,14 +21,25 @@ REDES_PERMITIDAS_DEFAULT = ["127.0.0.0/8"]
 
 
 def _carregar_redes():
+    """Return a fresh list of allowed networks.
+
+    Always a copy, so callers can never change the built-in default. A file
+    whose structure is not the expected one falls back to the default, and
+    entries that are not strings are ignored.
+    """
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, "r") as f:
                 dados = json.load(f)
-                return dados.get("redes_permitidas", REDES_PERMITIDAS_DEFAULT)
-        except (json.JSONDecodeError, OSError):
-            return REDES_PERMITIDAS_DEFAULT
-    return REDES_PERMITIDAS_DEFAULT
+        except (ValueError, OSError):
+            return list(REDES_PERMITIDAS_DEFAULT)
+        if not isinstance(dados, dict):
+            return list(REDES_PERMITIDAS_DEFAULT)
+        redes = dados.get("redes_permitidas", REDES_PERMITIDAS_DEFAULT)
+        if not isinstance(redes, list):
+            return list(REDES_PERMITIDAS_DEFAULT)
+        return [r for r in redes if isinstance(r, str)]
+    return list(REDES_PERMITIDAS_DEFAULT)
 
 
 def alvo_permitido(ip_ou_rede: str) -> bool:
