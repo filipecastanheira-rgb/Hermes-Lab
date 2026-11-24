@@ -196,8 +196,32 @@ just manual verification:
 - `test_purple_api_host.py` — local names are accepted, foreign and
   suffix-spoofed names (`localhost.evil.com`, `127.0.0.1.nip.io`) are refused
   with `400`, and the refusal happens before authentication.
+- `test_dashboard_page.py` — the dashboard page does not send a JSON content type
+  without a body (that used to make the server answer `400` to every dashboard
+  request).
+- `test_purple_api_bind.py` — the API starts only on loopback and refuses to start
+  any other way.
+- `test_purple_auth_store.py` — tokens are stored only as a digest, with several
+  tokens, one per person.
+- `test_purple_bootstrap.py` — local sign-in without a token: a single-use nonce
+  is exchanged for an `HttpOnly` cookie.
+- `test_purple_requests.py` — the exact shapes of request the dashboard sends,
+  at the Flask level.
+- `test_purple_session.py` — sessions have an absolute deadline and a cap, and
+  the nonce exchange is atomic.
+- `test_purple_tokens.py` — the token management helpers called by the CLI.
+- `test_purple_config.py` — `POST /config` rejects values the runtime cannot use
+  and leaves the config file untouched.
+- `test_purple_request_shapes.py` — request bodies of the wrong shape are refused
+  with `400` instead of failing with a `500`.
+- `test_lab_boundary_config.py` — the allowlist loader survives malformed files,
+  ignores entries that are not strings, and never changes the built-in default.
+- `test_target_size_limit.py` — a target inside the lab but over 256 addresses is
+  not scanned by nmap or OpenVAS.
+- `test_target_size_visible_refusal.py` — `/run_tool` and the AI dispatcher refuse
+  an oversized target visibly, not as a scan with no findings.
 
-These tests run with `pytest tests/` and are intended to keep failing loudly
+These tests run with `pytest tests/` (install `requirements-dev.txt` first) and are intended to keep failing loudly
 if any of these invariants ever regresses, rather than relying on the author
 remembering to check manually.
 
@@ -212,3 +236,8 @@ remembering to check manually.
   result. Because of this, the project intentionally runs in a
   non-autonomous mode: the user picks the tool and target, Hermes executes
   and reports. See the main README for the reasoning behind this decision.
+- Dependencies are pinned to the versions audited on 2026-11-23 (`pip-audit`:
+  no known vulnerabilities found) and will not be updated: this is a lab
+  project and the repository is not maintained. A later audit may report
+  vulnerabilities in these versions. To repeat the audit:
+  `pip install pip-audit && pip-audit -r requirements.txt`.

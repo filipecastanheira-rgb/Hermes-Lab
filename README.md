@@ -58,7 +58,9 @@ Every tool shares the same contract (`parse_evento` / `ler_uma_vez` / `vigiar`),
 
 ## Running it
 
-**Requirements:** Python 3.12 (tested), Firefox, and [Ollama](https://ollama.com) with the `llama3.2:3b` model pulled (`ollama pull llama3.2:3b`). The security tools are optional and are started on demand: nmap, tshark, Suricata, Zeek and OpenVAS/Greenbone. The automated tests need none of them.
+**Requirements:** Python 3.13.9 (tested), Firefox, and [Ollama](https://ollama.com) with the `llama3.2:3b` model pulled (`ollama pull llama3.2:3b`). The security tools are optional and are started on demand: nmap, tshark, Suricata, Zeek and OpenVAS/Greenbone. The automated tests need none of them.
+
+**Dependencies:** `requirements.txt` pins the runtime dependencies to the exact versions audited on 2026-11-23 (`pip-audit`: no known vulnerabilities found; Python 3.13.9). `requirements-dev.txt` adds pytest. This is a lab project and it is not maintained: these versions will not be updated, so a later audit may report vulnerabilities in them. To repeat the audit: `pip install pip-audit && pip-audit -r requirements.txt`.
 
 ```bash
 git clone https://github.com/filipecastanheira-rgb/Hermes-Lab.git
@@ -69,7 +71,7 @@ cp config/intelligence_config.example.json config/intelligence_config.json
 python3 hermes_cli.py
 ```
 
-This starts the PURPLE service (API, background monitoring, dashboard) and opens the dashboard in your default browser, already signed in: the CLI generates a single-use nonce and puts it in the URL fragment, which the page trades for an `HttpOnly` session cookie. Nothing to paste, nothing to store, and nothing in the URL that reaches the server. Tokens exist for clients that are not this machine — another host, a script — and are sent in the `X-Hermes-Token` header. Run the tests with `pytest tests/`.
+This starts the PURPLE service (API, background monitoring, dashboard) and opens the dashboard in your default browser, already signed in: the CLI generates a single-use nonce and puts it in the URL fragment, which the page trades for an `HttpOnly` session cookie. Nothing to paste, nothing to store, and nothing in the URL that reaches the server. Tokens exist for clients that are not this machine — another host, a script — and are sent in the `X-Hermes-Token` header. To run the tests, install `requirements-dev.txt` and run `pytest tests/`.
 
 **Why a private window:** Hermes opens the dashboard with `firefox --private-window`.
 This is a functional requirement, not a security one. Requests from the dashboard to the
