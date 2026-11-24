@@ -6,7 +6,7 @@ import time
 from flask import Flask, request, jsonify, Response
 
 from hermes.tools.agregador_ferramentas import ler_uma_vez_todas
-from hermes.core.lab_boundary import alvo_permitido
+from hermes.core.lab_boundary import MAX_ENDERECOS_ALVO, alvo_dentro_do_limite, alvo_permitido
 from functools import wraps
 
 # Nomes pelos quais a app se pode apresentar. So estes: a API nao foi feita
@@ -559,6 +559,12 @@ class PurpleAPI:
                 return jsonify({
                     "error": f"Target '{target}' is outside the authorized lab boundary. Attempt logged.",
                 }), 403
+
+            if tool in FERRAMENTAS_BASEADAS_EM_IP and not alvo_dentro_do_limite(target):
+                return jsonify({
+                    "error": f"Target '{target}' is too large to scan "
+                             f"(limit: {MAX_ENDERECOS_ALVO} addresses). Request refused.",
+                }), 400
 
             try:
                 eventos = ler_uma_vez_todas({tool: target})

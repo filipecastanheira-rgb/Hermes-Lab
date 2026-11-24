@@ -34,7 +34,7 @@ import subprocess
 import time
 import xml.etree.ElementTree as ET
 
-from hermes.core.lab_boundary import alvo_permitido
+from hermes.core.lab_boundary import alvo_dentro_do_limite, alvo_permitido
 from hermes.core.event_store import write_raw, write_clean
 from hermes.core.credentials import credentials
 
@@ -250,6 +250,10 @@ def ler_uma_vez(alvo):
     """
     if not alvo_permitido(alvo):
         print("[OPENVAS_READER] Target outside the authorized lab, refused: " + alvo)
+        return []
+
+    if not alvo_dentro_do_limite(alvo):
+        print("[OPENVAS_READER] Target too large, refused: " + alvo)
         return []
 
     target_id = _obter_ou_criar_target(alvo)

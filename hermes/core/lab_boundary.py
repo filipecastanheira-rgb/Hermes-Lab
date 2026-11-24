@@ -19,6 +19,9 @@ CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "lab
 
 REDES_PERMITIDAS_DEFAULT = ["127.0.0.0/8"]
 
+# One /24. A target can be inside the lab and still too large to scan.
+MAX_ENDERECOS_ALVO = 256
+
 
 def _carregar_redes():
     """Return a fresh list of allowed networks.
@@ -64,6 +67,22 @@ def alvo_permitido(ip_ou_rede: str) -> bool:
             return True
 
     return False
+
+
+def alvo_dentro_do_limite(ip_ou_rede, max_enderecos=MAX_ENDERECOS_ALVO) -> bool:
+    """
+    True only if the target is a valid address or network with at most
+    max_enderecos addresses. This is about size, not about membership of
+    the lab: it is checked together with alvo_permitido(). Anything that
+    is not a valid target string is refused.
+    """
+    if not isinstance(ip_ou_rede, str):
+        return False
+    try:
+        alvo = ipaddress.ip_network(ip_ou_rede, strict=False)
+    except ValueError:
+        return False
+    return alvo.num_addresses <= max_enderecos
 
 
 def adicionar_rede_permitida(rede_str: str):

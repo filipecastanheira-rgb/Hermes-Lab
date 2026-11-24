@@ -24,7 +24,7 @@ import subprocess
 import time
 import xml.etree.ElementTree as ET
 
-from hermes.core.lab_boundary import alvo_permitido
+from hermes.core.lab_boundary import alvo_dentro_do_limite, alvo_permitido
 from hermes.core.event_store import write_raw, write_clean
 
 
@@ -87,6 +87,10 @@ def _correr_scan(alvo: str) -> list:
     """
     if not alvo_permitido(alvo):
         print(f"[NMAP_READER] Target outside the authorized lab, refused: {alvo}")
+        return []
+
+    if not alvo_dentro_do_limite(alvo):
+        print(f"[NMAP_READER] Target too large, refused: {alvo}")
         return []
 
     try:

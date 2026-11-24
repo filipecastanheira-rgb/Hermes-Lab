@@ -33,7 +33,7 @@ Regras de seguranca (fixas, nao negociaveis nesta fase):
   loop quando openvas e chamado).
 """
 
-from hermes.core.lab_boundary import alvo_permitido
+from hermes.core.lab_boundary import MAX_ENDERECOS_ALVO, alvo_dentro_do_limite, alvo_permitido
 from hermes.tools.agregador_ferramentas import ler_uma_vez_todas
 
 
@@ -106,6 +106,12 @@ def dispatch(tool_call):
             return {
                 "ok": False,
                 "erro": "Alvo '" + target + "' fora do lab_boundary. Pedido recusado e nao executado.",
+            }
+        if not alvo_dentro_do_limite(target):
+            return {
+                "ok": False,
+                "erro": "Target '" + target + "' is too large (limit: "
+                        + str(MAX_ENDERECOS_ALVO) + " addresses). Request refused and not executed.",
             }
     else:
         target = info["interface_fixa"]
