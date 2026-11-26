@@ -193,7 +193,9 @@ class GuestView:
         self.logger = logger
         self.bind = endereco_bind_convidado(bind)
         self.porta = int(porta)
-        self.hosts_permitidos = {self.bind, f"{self.bind}:{self.porta}"}
+        # An IPv6 literal goes in square brackets in a Host header.
+        nome = f"[{self.bind}]" if ipaddress.ip_address(self.bind).version == 6 else self.bind
+        self.hosts_permitidos = {nome, f"{nome}:{self.porta}"}
         self.app = Flask(__name__, static_folder=None)
         self._registar_rotas()
 
