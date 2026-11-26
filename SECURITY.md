@@ -236,7 +236,7 @@ remembering to check manually.
   result. Because of this, the project intentionally runs in a
   non-autonomous mode: the user picks the tool and target, Hermes executes
   and reports. See the main README for the reasoning behind this decision.
-- Dependencies are pinned to the versions audited on 2026-11-23 (`pip-audit`:
+- Dependencies are pinned to the versions audited on 2026-11-26 (`pip-audit`:
   no known vulnerabilities found) and will not be updated: this is a lab
   project and the repository is not maintained. A later audit may report
   vulnerabilities in these versions. To repeat the audit:

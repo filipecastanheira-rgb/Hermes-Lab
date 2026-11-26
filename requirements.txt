@@ -1,4 +1,4 @@
-# Runtime dependencies, pinned to the exact versions audited on 2026-11-23
+# Runtime dependencies, pinned to the exact versions audited on 2026-11-26
 # (pip-audit: no known vulnerabilities found; tested with Python 3.13.9).
 # This is a lab project and it is not maintained: these versions will not be updated.
 # To repeat the audit: pip install pip-audit && pip-audit -r requirements.txt

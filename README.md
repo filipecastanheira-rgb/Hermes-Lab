@@ -60,7 +60,7 @@ Every tool shares the same contract (`parse_evento` / `ler_uma_vez` / `vigiar`),
 
 **Requirements:** Python 3.13.9 (tested), Firefox, and [Ollama](https://ollama.com) with the `llama3.2:3b` model pulled (`ollama pull llama3.2:3b`). The security tools are optional and are started on demand: nmap, tshark, Suricata, Zeek and OpenVAS/Greenbone. The automated tests need none of them.
 
-**Dependencies:** `requirements.txt` pins the runtime dependencies to the exact versions audited on 2026-11-23 (`pip-audit`: no known vulnerabilities found; Python 3.13.9). `requirements-dev.txt` adds pytest. This is a lab project and it is not maintained: these versions will not be updated, so a later audit may report vulnerabilities in them. To repeat the audit: `pip install pip-audit && pip-audit -r requirements.txt`.
+**Dependencies:** `requirements.txt` pins the runtime dependencies to the exact versions audited on 2026-11-26 (`pip-audit`: no known vulnerabilities found; Python 3.13.9). `requirements-dev.txt` adds pytest. This is a lab project and it is not maintained: these versions will not be updated, so a later audit may report vulnerabilities in them. To repeat the audit: `pip install pip-audit && pip-audit -r requirements.txt`.
 
 ```bash
 git clone https://github.com/filipecastanheira-rgb/Hermes-Lab.git
