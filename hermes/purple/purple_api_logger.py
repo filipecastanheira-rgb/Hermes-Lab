@@ -2,6 +2,7 @@ import json
 import time
 import os
 import hashlib
+import threading
 
 
 def token_ref(token):
@@ -36,9 +37,22 @@ class PurpleAPILogger:
     resumo SHA-256 truncado (ver `token_ref()`).
     """
 
-    def __init__(self, ficheiro="logs/purple_api.log"):
+    def __init__(self, ficheiro="logs/purple_api.log", max_bytes=5 * 1024 * 1024):
         os.makedirs(os.path.dirname(ficheiro), exist_ok=True)
         self.ficheiro = ficheiro
+        self.max_bytes = max_bytes
+        self._trava = threading.Lock()
+
+    def _rodar_se_preciso(self, extra):
+        """Move the log to <file>.1 when the next line would pass the limit.
+        Only one previous copy is kept, so the log never passes twice the limit."""
+        try:
+            tamanho = os.path.getsize(self.ficheiro)
+        except OSError:
+            return
+        if tamanho > 0 and tamanho + extra > self.max_bytes:
+            os.replace(self.ficheiro, self.ficheiro + ".1")
+            os.chmod(self.ficheiro + ".1", 0o600)
 
     # ============================================================
     # Função interna para escrever JSON no ficheiro
@@ -53,8 +67,15 @@ class PurpleAPILogger:
 
         linha = json.dumps(evento, ensure_ascii=False)
 
-        with open(self.ficheiro, "a") as f:
-            f.write(linha + "\n")
+        dados_linha = (linha + "\n").encode("utf-8")
+        with self._trava:
+            self._rodar_se_preciso(len(dados_linha))
+            fd = os.open(self.ficheiro, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+            try:
+                os.fchmod(fd, 0o600)
+                os.write(fd, dados_linha)
+            finally:
+                os.close(fd)
 
     # ============================================================
     # Auditoria de chamadas
@@ -72,11 +93,13 @@ class PurpleAPILogger:
     # Auditoria de respostas
     # ============================================================
     def log_resposta(self, endpoint, resposta):
-        if isinstance(resposta, dict) and "novo_token" in resposta:
-            resposta = {**resposta, "novo_token": "***"}
+        # Only the endpoint and the size of the body are kept: the body holds real
+        # events and the dashboard poll repeats it every few seconds. The events
+        # themselves are stored once, in runtime/raw, which has a retention.
+        tamanho = len(json.dumps(resposta, ensure_ascii=False, default=str).encode("utf-8"))
         self._escrever("resposta", {
             "endpoint": endpoint,
-            "resposta": resposta
+            "bytes": tamanho
         })
 
     # ============================================================
