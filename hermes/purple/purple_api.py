@@ -6,7 +6,7 @@ import time
 from flask import Flask, request, jsonify, Response
 
 from hermes.tools.agregador_ferramentas import ler_uma_vez_todas
-from hermes.core.lab_boundary import MAX_ENDERECOS_ALVO, alvo_dentro_do_limite, alvo_permitido
+from hermes.core.lab_boundary import MAX_ENDERECOS_ALVO, alvo_dentro_do_limite, alvo_permitido, interface_valida
 from functools import wraps
 
 # Nomes pelos quais a app se pode apresentar. So estes: a API nao foi feita
@@ -564,6 +564,11 @@ class PurpleAPI:
                 return jsonify({
                     "error": f"Target '{target}' is too large to scan "
                              f"(limit: {MAX_ENDERECOS_ALVO} addresses). Request refused.",
+                }), 400
+
+            if tool == "tshark" and not interface_valida(target):
+                return jsonify({
+                    "error": f"Target '{target}' is not a valid network interface name. Request refused.",
                 }), 400
 
             try:

@@ -18,7 +18,7 @@ persistidos em raw/ e emitidos para clean/ no schema Hermes.
 import time
 
 from hermes.tools.tshark.tshark import TSharkTool
-from hermes.core.lab_boundary import alvo_permitido
+from hermes.core.lab_boundary import alvo_permitido, interface_valida
 from hermes.core.event_store import write_raw, write_clean
 
 
@@ -82,6 +82,10 @@ def ler_uma_vez(interface: str = "lo", count: int = 10) -> list:
     Faz uma captura finita e devolve eventos já traduzidos (só os que
     passam no lab_boundary).
     """
+    if not interface_valida(interface):
+        print(f"[TSHARK_READER] Not a valid interface name, refused: {interface!r}")
+        return []
+
     ferramenta = TSharkTool()
     brutos = ferramenta.capturar(interface, count)
     eventos = [parse_evento(evento) for evento in brutos]

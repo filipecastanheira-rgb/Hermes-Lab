@@ -14,6 +14,7 @@ seguro por omissão.
 import ipaddress
 import json
 import os
+import re
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "lab_allowed.json")
 
@@ -83,6 +84,16 @@ def alvo_dentro_do_limite(ip_ou_rede, max_enderecos=MAX_ENDERECOS_ALVO) -> bool:
     except ValueError:
         return False
     return alvo.num_addresses <= max_enderecos
+
+
+def interface_valida(nome) -> bool:
+    """
+    True only if nome looks like a Linux network interface name: up to 15
+    characters, letters, digits, dot, underscore or hyphen, and not starting
+    with a hyphen. A capture target that is anything else (a path, a URL, an
+    option, text with spaces or shell characters) is refused before tshark runs.
+    """
+    return isinstance(nome, str) and re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._-]{0,14}", nome) is not None
 
 
 def adicionar_rede_permitida(rede_str: str):
