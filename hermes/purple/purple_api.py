@@ -7,6 +7,12 @@ from flask import Flask, request, jsonify, Response
 
 from hermes.tools.agregador_ferramentas import ler_uma_vez_todas
 from hermes.core.lab_boundary import MAX_ENDERECOS_ALVO, alvo_dentro_do_limite, alvo_permitido, interface_valida
+from os.path import realpath
+from hermes.tools.suricata.suricata_reader import EVE_PATH_DEFAULT
+from hermes.tools.zeek.zeek_reader import CONN_LOG_DEFAULT
+
+# suricata and zeek read one log file each; /run_tool accepts no other path.
+CAMINHOS_FIXOS = {"suricata": EVE_PATH_DEFAULT, "zeek": CONN_LOG_DEFAULT}
 from functools import wraps
 
 # Nomes pelos quais a app se pode apresentar. So estes: a API nao foi feita
@@ -564,6 +570,13 @@ class PurpleAPI:
                 return jsonify({
                     "error": f"Target '{target}' is too large to scan "
                              f"(limit: {MAX_ENDERECOS_ALVO} addresses). Request refused.",
+                }), 400
+
+            ficheiro_fixo = CAMINHOS_FIXOS.get(tool)
+            if ficheiro_fixo is not None and realpath(target) != realpath(ficheiro_fixo):
+                return jsonify({
+                    "error": f"Target '{target}' is not the log file this tool reads "
+                             f"({ficheiro_fixo}). Request refused.",
                 }), 400
 
             if tool == "tshark" and not interface_valida(target):
