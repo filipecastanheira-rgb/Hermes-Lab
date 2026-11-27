@@ -23,7 +23,7 @@ def test_loopback_explicito_e_aceite(host):
 
 @pytest.mark.parametrize("host", [
     "0.0.0.0",              # todas as interfaces: o acidente classico
-    "192.168.68.107",       # o IP da maquina na LAN
+    "192.168.1.10",         # a typical LAN address
     "10.0.0.5",
     "localhost",            # nome, nao endereco: depende do resolver
     "",
